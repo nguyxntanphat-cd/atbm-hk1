@@ -1,0 +1,25 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Nhân viên - Gửi tài liệu</title>
+<style>body{font-family:system-ui;max-width:640px;margin:40px auto;padding:0 16px}input,select,button{width:100%;padding:10px;margin:6px 0;box-sizing:border-box}button{background:#2563eb;color:#fff;border:0;border-radius:6px;cursor:pointer}pre{background:#f1f5f9;padding:10px;white-space:pre-wrap;word-break:break-all;font-size:12px}</style></head>
+<body>
+<div style="display:flex;justify-content:space-between;align-items:center">
+  <h2>📤 Gửi tài liệu cho Boss (RSA + AES)</h2>
+  <a href="/logout">Đăng xuất</a>
+</div>
+<input id="sender" placeholder="Tên nhân viên">
+<select id="recipient"><option>Boss</option></select>
+<input id="title" placeholder="Tiêu đề">
+<select id="category"><option>Báo cáo cấu trúc dự án</option><option>Tài liệu cần Boss ký</option><option>Khác</option></select>
+<input type="file" id="file">
+<button onclick="go()">Mã hoá & Gửi</button>
+<pre id="log"></pre>
+<script src="/sender.js"></script>
+<script>
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(u => { if (u && !sender.value) sender.value = u.name; });
+function go() {
+  const f = file.files[0]; if (!f) return alert('Chọn file');
+  log.textContent = '';
+  encryptAndSend(f, { sender: sender.value, title: title.value, category: category.value },
+    t => log.textContent += t + '\n').catch(e => log.textContent += '❌ ' + e.message);
+}
+</script></body></html>
+

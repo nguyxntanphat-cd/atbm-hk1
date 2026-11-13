@@ -1,0 +1,23 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Công cụ giải mã</title>
+<style>body{font-family:system-ui;max-width:640px;margin:40px auto;padding:0 16px}input,button{width:100%;padding:10px;margin:6px 0;box-sizing:border-box}pre{background:#f1f5f9;padding:10px;white-space:pre-wrap;word-break:break-all;font-size:12px}</style></head>
+<body>
+<div style="display:flex;justify-content:space-between;align-items:center">
+  <h2>🛠 Công cụ giải mã thủ công (Admin)</h2>
+  <div><a href="/admin">Hộp thư Boss</a> | <a href="/logout">Đăng xuất</a></div>
+</div>
+<p>Tải lên file <code>.enc.json</code> (bản mã) và nhập passphrase của private key.</p>
+<input type="file" id="f"><input type="password" id="pass" placeholder="Passphrase">
+<button onclick="go()">Giải mã</button><pre id="out"></pre>
+<script>
+async function go() {
+  if (!f.files[0]) return alert('Chọn file');
+  const pkg = JSON.parse(await f.files[0].text());
+  out.textContent = 'encKey (RSA): ' + pkg.encKey.slice(0, 80) + '...\nIV: ' + pkg.iv + '\n';
+  const r = await fetch('/api/decrypt', { method: 'POST', body: JSON.stringify({ pkg, passphrase: pass.value }) });
+  const j = await r.json(); if (!r.ok) return out.textContent += '❌ ' + j.error;
+  out.textContent += '✅ Giải mã thành công: ' + j.filename;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([Uint8Array.from(atob(j.data), c => c.charCodeAt(0))])); a.download = j.filename; a.click();
+}
+</script></body></html>
+
