@@ -1,0 +1,39 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Boss - Hộp thư</title>
+<style>body{font-family:system-ui;max-width:960px;margin:40px auto;padding:0 16px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px;font-size:14px}button{padding:6px 10px;cursor:pointer}input{padding:8px}pre{background:#f1f5f9;padding:10px;white-space:pre-wrap;max-height:300px;overflow:auto}</style></head>
+<body>
+<div style="display:flex;justify-content:space-between;align-items:center">
+  <h2>📥 Hộp thư Boss</h2>
+  <div><a href="/tool">Công cụ giải mã thủ công</a> | <a href="/logout">Đăng xuất</a></div>
+</div>
+<p>Passphrase mở private key: <input type="password" id="pass">
+<label><input type="checkbox" id="auto"> Tự động giải mã khi có tài liệu mới</label></p>
+<table><thead><tr><th>Thời gian</th><th>Người gửi</th><th>Loại</th><th>Tiêu đề</th><th>File</th><th>Hành động</th></tr></thead><tbody id="tb"></tbody></table>
+<h3 id="vt"></h3><pre id="view"></pre>
+<script>
+pass.value = sessionStorage.pass || ''; auto.checked = sessionStorage.auto === '1';
+pass.onchange = () => sessionStorage.pass = pass.value; auto.onchange = () => sessionStorage.auto = auto.checked ? '1' : '';
+const bytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+const cache = {};
+async function dec(id) { // UC12
+  const r = await fetch('/api/decrypt', { method: 'POST', body: JSON.stringify({ id, passphrase: pass.value }) });
+  const j = await r.json(); if (!r.ok) { alert(j.error); return null; }
+  return cache[id] = j;
+}
+async function viewDoc(id) { // UC15 – Xem
+  const j = cache[id] || await dec(id); if (!j) return;
+  vt.textContent = '🔓 ' + j.filename;
+  view.textContent = /\.(txt|md|csv|json|html?|js)$/i.test(j.filename) ? new TextDecoder().decode(bytes(j.data)) : '(File nhị phân – bấm Lưu để mở)';
+}
+async function saveDoc(id) { // UC16 – Lưu
+  const j = cache[id] || await dec(id); if (!j) return;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes(j.data)])); a.download = j.filename; a.click();
+}
+async function load() { // UC11 – Tiếp nhận
+  const list = await (await fetch('/api/list')).json();
+  tb.innerHTML = list.map(m => `<tr><td>${new Date(m.time).toLocaleString()}</td><td>${m.sender || ''}</td><td>${m.category}</td><td>${m.title || ''}</td><td>${m.filename}${cache[m.id] ? ' 🔓' : ' 🔒'}</td>
+    <td><button onclick="viewDoc('${m.id}')">Xem</button> <button onclick="saveDoc('${m.id}')">Lưu</button> <a href="/api/raw?id=${m.id}">Bản mã</a></td></tr>`).join('');
+  if (auto.checked && pass.value) { let n = 0; for (const m of list) if (!cache[m.id] && await dec(m.id)) n++; if (n) load(); }
+}
+load(); setInterval(load, 5000);
+</script></body></html>
+

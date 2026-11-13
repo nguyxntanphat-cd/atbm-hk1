@@ -1,0 +1,31 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Đăng nhập - Hệ thống truyền tải nội bộ</title>
+<style>body{font-family:system-ui;max-width:400px;margin:80px auto;padding:0 16px}input,button{width:100%;padding:10px;margin:6px 0;box-sizing:border-box}button{background:#2563eb;color:#fff;border:0;border-radius:6px;cursor:pointer}.box{background:#f1f5f9;padding:10px 12px;border-radius:6px;font-size:13px;margin-top:12px}#err{color:#dc2626;font-size:14px;min-height:20px}</style></head>
+<body>
+<h2>🔐 Đăng nhập hệ thống</h2>
+<form onsubmit="login(event)">
+  <input id="username" placeholder="Tên đăng nhập" required autofocus>
+  <input id="password" type="password" placeholder="Mật khẩu" required>
+  <button type="submit">Đăng nhập</button>
+</form>
+<div id="err"></div>
+<div class="box">
+  <b>Tài khoản mặc định:</b><br>
+  • Nhân viên: <code>nhanvien</code> / <code>123456</code><br>
+  • Boss (Admin): <code>boss</code> / <code>admin123</code>
+</div>
+<script>
+async function login(e) {
+  e.preventDefault();
+  err.textContent = '';
+  const r = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: username.value.trim(), password: password.value })
+  });
+  const j = await r.json();
+  if (!r.ok) { err.textContent = j.error || 'Đăng nhập thất bại'; return; }
+  location.href = j.redirect;
+}
+</script>
+</body></html>
+
