@@ -1,0 +1,20 @@
+{
+  "name": "atbm-truyen-tai-noi-bo",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Đồ án mã hoá lai RSA-OAEP và AES-GCM trong truyền tải tài liệu nội bộ",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "key:change-passphrase": "node scripts/change-passphrase.js",
+    "db:init": "node scripts/init-db.js",
+    "backup": "node scripts/backup.js create",
+    "backup:verify": "node scripts/backup.js verify"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "mysql2": "^3.24.6"
+  }
+}

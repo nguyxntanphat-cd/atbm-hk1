@@ -1,32 +1,34 @@
-// ===== BÊN GỬI (Nhân viên) – Use Case 3, 6, 7, 8, 9, 10 =====
-// Chạy trên trình duyệt: dữ liệu được mã hoá TRƯỚC khi rời máy nhân viên.
-// Bên gửi chỉ dùng PUBLIC KEY lấy từ keystore/sender/.
-const toB64 = buf => { let s = '', u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
-
-// UC3 – Xác định khoá công khai người nhận
-async function getRecipientPublicKey() {
-  const pem = await (await fetch('/api/public-key')).text();
-  const der = Uint8Array.from(atob(pem.replace(/-----[^-]+-----|\s/g, '')), c => c.charCodeAt(0));
-  return crypto.subtle.importKey('spki', der, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+// Bên gửi chỉ sử dụng public key, mã hoá trước khi dữ liệu rời trình duyệt.
+'use strict';
+function toB64(buffer) {
+  const bytes = new Uint8Array(buffer); let value = '';
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    value += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(value);
 }
-
-// UC6 – Gửi dữ liệu bảo mật
 async function encryptAndSend(file, meta, log) {
-  const pub = await getRecipientPublicKey();
-  log('1. Lấy public key RSA-2048 của người nhận');
-  // UC7 – Sinh khoá AES-256 mới cho mỗi lần gửi
+  if (!window.crypto?.subtle) throw new Error('Trình duyệt cần HTTPS hoặc localhost để dùng Web Crypto.');
+  if (file.size > PackageFormat.MAX_FILE_BYTES) throw new Error('File tối đa 10 MiB.');
+  if (meta.title.length > 200) throw new Error('Tiêu đề tối đa 200 ký tự.');
+  const [user, recipient] = await Promise.all([App.request('/api/me'), App.request('/api/public-key?recipient=' + encodeURIComponent(meta.recipientUsername || 'boss'))]);
+  const der = App.bytes(recipient.pem.replace(/-----[^-]+-----|\s/g, ''));
+  const publicKey = await crypto.subtle.importKey('spki', der, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+  log('1. Đã lấy public key của người nhận.');
+  const pkg = { version: PackageFormat.VERSION, algorithm: PackageFormat.ALGORITHM,
+    keyId: recipient.keyId, senderUsername: user.username, sender: user.name,
+    recipientUsername: recipient.recipientUsername, title: meta.title, category: meta.category, filename: file.name, fileSize: file.size,
+    previousId: meta.previousId || null, expiresAt: meta.expiresAt || null };
   const aes = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  log('2. Sinh khoá AES-256 ngẫu nhiên + IV 96-bit');
-  // UC8 – Mã hoá dữ liệu bằng AES-GCM
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, await file.arrayBuffer());
-  log('3. Mã hoá file bằng AES-256-GCM (' + file.size + ' bytes)');
-  // UC9 – Mã hoá khoá AES bằng RSA-OAEP
-  const encKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, pub, await crypto.subtle.exportKey('raw', aes));
-  log('4. Mã hoá khoá AES bằng RSA-OAEP:\n   ' + toB64(encKey).slice(0, 100) + '...');
-  // UC10 – Truyền gói dữ liệu mã hoá
-  const r = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...meta, filename: file.name, encKey: toB64(encKey), iv: toB64(iv), data: toB64(ct) }) });
-  log(r.ok ? '5. ✅ Đã gửi gói mã hoá. ID: ' + (await r.json()).id : '❌ Lỗi truyền');
+  log('2. Đã sinh khoá AES-256 và IV mới cho file này.');
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, tagLength: 128,
+    additionalData: new TextEncoder().encode(PackageFormat.aadText(pkg)) }, aes, await file.arrayBuffer());
+  log('3. Đã mã hoá file và ràng buộc thông tin tài liệu bằng AES-GCM.');
+  const raw = new Uint8Array(await crypto.subtle.exportKey('raw', aes));
+  let encKey;
+  try { encKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, publicKey, raw); }
+  finally { raw.fill(0); }
+  log('4. Đã bọc khoá AES bằng RSA-OAEP/SHA-256.');
+  const result = await App.request('/api/upload', { ...pkg, encKey: toB64(encKey), iv: toB64(iv), data: toB64(data) });
+  log('5. Đã gửi tài liệu. Mã: ' + result.id);
 }
-

@@ -3,3 +3,15 @@ keystore/*.pem
 keystore/sender/*.pem
 keystore/receiver/*.pem
 storage/*.json
+storage/*.tmp
+keystore/**/*.tmp
+.env
+.env.*
+!.env.example
+certs/
+backups/
+runtime/
+storage/.quarantine/
+keystore/app-secrets.key
+keystore/users/
+keystore/.service.lock
