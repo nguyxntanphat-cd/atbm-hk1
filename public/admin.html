@@ -1,39 +1,21 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Boss - Hộp thư</title>
-<style>body{font-family:system-ui;max-width:960px;margin:40px auto;padding:0 16px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px;font-size:14px}button{padding:6px 10px;cursor:pointer}input{padding:8px}pre{background:#f1f5f9;padding:10px;white-space:pre-wrap;max-height:300px;overflow:auto}</style></head>
-<body>
-<div style="display:flex;justify-content:space-between;align-items:center">
-  <h2>📥 Hộp thư Boss</h2>
-  <div><a href="/tool">Công cụ giải mã thủ công</a> | <a href="/logout">Đăng xuất</a></div>
-</div>
-<p>Passphrase mở private key: <input type="password" id="pass">
-<label><input type="checkbox" id="auto"> Tự động giải mã khi có tài liệu mới</label></p>
-<table><thead><tr><th>Thời gian</th><th>Người gửi</th><th>Loại</th><th>Tiêu đề</th><th>File</th><th>Hành động</th></tr></thead><tbody id="tb"></tbody></table>
-<h3 id="vt"></h3><pre id="view"></pre>
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090d18"><title>Hộp thư · Aether Vault</title><link rel="stylesheet" href="/style.css"></head><body>
+<header class="topbar shell"><a class="brand" href="/admin"><span class="brand-mark">✳</span><span>AETHER VAULT<small>secure document exchange</small></span></a><div class="top-actions"><span class="live"><i></i> Hộp thư trực tiếp</span><a class="link-btn" href="/logout">Đăng xuất</a></div></header>
+<nav class="shell app-nav"><a class="active" href="/admin">Tổng quan & hộp thư</a><a href="/activity">Biến động hệ thống</a><a href="/tool">Công cụ giải mã</a></nav>
+<main class="shell"><section class="hero"><div class="eyebrow">Trung tâm điều hành · Quản trị viên</div><h1>Hộp thư bảo mật.</h1><p>Quản lý tài liệu đã mã hóa, tìm nhanh theo người gửi hoặc danh mục, xem trước và lưu bản đã giải mã.</p></section>
+<section class="stats"><div class="card stat"><div class="stat-label">TỔNG GÓI TIN</div><div id="total" class="stat-value">—</div><div class="stat-foot">Trong hộp thư</div></div><div class="card stat"><div class="stat-label">ĐÃ GIẢI MÃ</div><div id="unlocked" class="stat-value">—</div><div class="stat-foot">Phiên trình duyệt này</div></div><div class="card stat"><div class="stat-label">DUNG LƯỢNG MÃ HÓA</div><div id="volume" class="stat-value">—</div><div class="stat-foot">Đang lưu an toàn</div></div></section>
+<section class="card card-pad"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap"><div><h2 class="card-title">Tài liệu đến</h2><p class="card-sub">Danh sách tự làm mới mỗi 10 giây.</p></div><label class="live" style="cursor:pointer"><input id="auto" type="checkbox" style="accent-color:#75f0cf"> Tự giải mã</label></div>
+<div class="field"><label for="pass">Passphrase private key</label><input class="input" style="max-width:420px" type="password" id="pass" placeholder="Nhập passphrase để mở tài liệu"></div>
+<div class="toolbar" style="margin-top:18px"><input class="input" id="search" placeholder="⌕  Tìm tên, tiêu đề, người gửi…"><select class="select" id="category"><option value="">Tất cả danh mục</option></select><select class="select" id="sort"><option value="new">Mới nhất</option><option value="old">Cũ nhất</option><option value="sender">Người gửi A–Z</option></select><button class="btn" onclick="load()">↻ Làm mới</button></div>
+<div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Người gửi</th><th>Danh mục / tiêu đề</th><th>Tệp</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="tb"></tbody></table><div id="empty" class="empty" style="display:none">◈<br><br>Chưa có tài liệu phù hợp.</div></div>
+<section id="preview" class="preview"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><div class="eyebrow">Bản xem trước đã giải mã</div><h3 id="preview-title" class="card-title" style="margin-top:7px"></h3></div><button class="icon-btn" onclick="closePreview()">Đóng ×</button></div><pre id="view"></pre></section></section></main><footer class="footer">AETHER VAULT · Quản trị hộp thư</footer>
 <script>
-pass.value = sessionStorage.pass || ''; auto.checked = sessionStorage.auto === '1';
-pass.onchange = () => sessionStorage.pass = pass.value; auto.onchange = () => sessionStorage.auto = auto.checked ? '1' : '';
-const bytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-const cache = {};
-async function dec(id) { // UC12
-  const r = await fetch('/api/decrypt', { method: 'POST', body: JSON.stringify({ id, passphrase: pass.value }) });
-  const j = await r.json(); if (!r.ok) { alert(j.error); return null; }
-  return cache[id] = j;
-}
-async function viewDoc(id) { // UC15 – Xem
-  const j = cache[id] || await dec(id); if (!j) return;
-  vt.textContent = '🔓 ' + j.filename;
-  view.textContent = /\.(txt|md|csv|json|html?|js)$/i.test(j.filename) ? new TextDecoder().decode(bytes(j.data)) : '(File nhị phân – bấm Lưu để mở)';
-}
-async function saveDoc(id) { // UC16 – Lưu
-  const j = cache[id] || await dec(id); if (!j) return;
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes(j.data)])); a.download = j.filename; a.click();
-}
-async function load() { // UC11 – Tiếp nhận
-  const list = await (await fetch('/api/list')).json();
-  tb.innerHTML = list.map(m => `<tr><td>${new Date(m.time).toLocaleString()}</td><td>${m.sender || ''}</td><td>${m.category}</td><td>${m.title || ''}</td><td>${m.filename}${cache[m.id] ? ' 🔓' : ' 🔒'}</td>
-    <td><button onclick="viewDoc('${m.id}')">Xem</button> <button onclick="saveDoc('${m.id}')">Lưu</button> <a href="/api/raw?id=${m.id}">Bản mã</a></td></tr>`).join('');
-  if (auto.checked && pass.value) { let n = 0; for (const m of list) if (!cache[m.id] && await dec(m.id)) n++; if (n) load(); }
-}
-load(); setInterval(load, 5000);
+const $=s=>document.querySelector(s),cache={},state={list:[]};$('#pass').value=sessionStorage.aetherPass||'';$('#auto').checked=sessionStorage.aetherAuto==='1';$('#pass').onchange=()=>sessionStorage.aetherPass=$('#pass').value;$('#auto').onchange=()=>sessionStorage.aetherAuto=$('#auto').checked?'1':'';$('#search').oninput=render;$('#category').onchange=render;$('#sort').onchange=render;
+function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function bytes(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}function size(n){return n>1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.max(1,Math.round(n*3/4/1024))+' KB'}
+async function dec(id){const r=await fetch('/api/decrypt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,passphrase:$('#pass').value})});const j=await r.json();if(!r.ok)throw Error(j.error||'Giải mã thất bại');cache[id]=j;return j}
+async function viewDoc(id){try{const j=cache[id]||await dec(id);$('#preview-title').textContent='◈ '+j.filename;$('#view').textContent=/\.(txt|md|csv|json|html?|js|css|xml|log)$/i.test(j.filename)?new TextDecoder().decode(bytes(j.data)):'Tài liệu nhị phân. Hãy dùng nút Lưu để tải về và mở bằng ứng dụng phù hợp.';$('#preview').classList.add('show');render()}catch(e){alert(e.message)}}
+async function saveDoc(id){try{const j=cache[id]||await dec(id);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes(j.data)]));a.download=j.filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);render()}catch(e){alert(e.message)}}
+async function removeDoc(id){if(!confirm('Xóa vĩnh viễn gói tin mã hóa này?'))return;const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});const j=await r.json();if(!r.ok)return alert(j.error||'Không thể xóa');delete cache[id];load()}
+function closePreview(){$('#preview').classList.remove('show')}
+function render(){let list=[...state.list];const q=$('#search').value.toLocaleLowerCase('vi');const cat=$('#category').value;list=list.filter(m=>(!cat||m.category===cat)&&(!q||[m.sender,m.title,m.filename,m.category].join(' ').toLocaleLowerCase('vi').includes(q)));if($('#sort').value==='old')list.reverse();if($('#sort').value==='sender')list.sort((a,b)=>(a.sender||'').localeCompare(b.sender||'','vi'));$('#empty').style.display=list.length?'none':'block';$('#tb').innerHTML=list.map(m=>`<tr><td>${new Date(m.time).toLocaleString('vi-VN')}</td><td>${esc(m.sender||'—')}</td><td><span class="pill">${esc(m.category||'Khác')}</span><div style="margin-top:7px;color:#9eacc4">${esc(m.title||'Không có tiêu đề')}</div></td><td>${esc(m.filename)}<div class="file-meta">${size(m.size)}</div></td><td>${cache[m.id]?'<span style="color:#75f0cf">● Đã mở</span>':'<span style="color:#91a0ba">● Đã mã hóa</span>'}</td><td><div class="actions"><button class="icon-btn" onclick="viewDoc('${esc(m.id)}')">Xem</button><button class="icon-btn" onclick="saveDoc('${esc(m.id)}')">Lưu</button><a class="icon-btn" href="/api/raw?id=${encodeURIComponent(m.id)}">Gói mã</a><button class="icon-btn" title="Xóa" onclick="removeDoc('${esc(m.id)}')">×</button></div></td></tr>`).join('');$('#total').textContent=state.list.length;$('#unlocked').textContent=Object.keys(cache).length;$('#volume').textContent=size(state.list.reduce((n,m)=>n+m.size,0))}
+async function load(){try{const r=await fetch('/api/list');if(!r.ok)throw Error('Không tải được hộp thư');state.list=await r.json();const current=$('#category').value,cats=[...new Set(state.list.map(m=>m.category).filter(Boolean))];$('#category').innerHTML='<option value="">Tất cả danh mục</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('#category').value=current;render();if($('#auto').checked&&$('#pass').value){for(const m of state.list)if(!cache[m.id])try{await dec(m.id)}catch{}render()}}catch(e){console.error(e)}}load();setInterval(load,10000);
 </script></body></html>
-

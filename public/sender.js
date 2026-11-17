@@ -27,6 +27,8 @@ async function encryptAndSend(file, meta, log) {
   // UC10 – Truyền gói dữ liệu mã hoá
   const r = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...meta, filename: file.name, encKey: toB64(encKey), iv: toB64(iv), data: toB64(ct) }) });
-  log(r.ok ? '5. ✅ Đã gửi gói mã hoá. ID: ' + (await r.json()).id : '❌ Lỗi truyền');
+  const result = await r.json();
+  if (!r.ok) throw new Error(result.error || 'Lỗi truyền gói mã hóa');
+  log('5. ✅ Đã gửi gói mã hóa. ID: ' + result.id);
 }
 

@@ -1,23 +1,6 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Công cụ giải mã</title>
-<style>body{font-family:system-ui;max-width:640px;margin:40px auto;padding:0 16px}input,button{width:100%;padding:10px;margin:6px 0;box-sizing:border-box}pre{background:#f1f5f9;padding:10px;white-space:pre-wrap;word-break:break-all;font-size:12px}</style></head>
-<body>
-<div style="display:flex;justify-content:space-between;align-items:center">
-  <h2>🛠 Công cụ giải mã thủ công (Admin)</h2>
-  <div><a href="/admin">Hộp thư Boss</a> | <a href="/logout">Đăng xuất</a></div>
-</div>
-<p>Tải lên file <code>.enc.json</code> (bản mã) và nhập passphrase của private key.</p>
-<input type="file" id="f"><input type="password" id="pass" placeholder="Passphrase">
-<button onclick="go()">Giải mã</button><pre id="out"></pre>
-<script>
-async function go() {
-  if (!f.files[0]) return alert('Chọn file');
-  const pkg = JSON.parse(await f.files[0].text());
-  out.textContent = 'encKey (RSA): ' + pkg.encKey.slice(0, 80) + '...\nIV: ' + pkg.iv + '\n';
-  const r = await fetch('/api/decrypt', { method: 'POST', body: JSON.stringify({ pkg, passphrase: pass.value }) });
-  const j = await r.json(); if (!r.ok) return out.textContent += '❌ ' + j.error;
-  out.textContent += '✅ Giải mã thành công: ' + j.filename;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([Uint8Array.from(atob(j.data), c => c.charCodeAt(0))])); a.download = j.filename; a.click();
-}
-</script></body></html>
-
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090d18"><title>Công cụ giải mã · Aether Vault</title><link rel="stylesheet" href="/style.css"></head><body>
+<header class="topbar shell"><a class="brand" href="/admin"><span class="brand-mark">✳</span><span>AETHER VAULT<small>secure document exchange</small></span></a><div class="top-actions"><a class="link-btn" href="/admin">← Hộp thư</a><a class="link-btn" href="/logout">Đăng xuất</a></div></header>
+<main class="shell"><section class="hero"><div class="eyebrow">Tiện ích quản trị viên</div><h1>Mở gói tin mã hóa.</h1><p>Khôi phục tài liệu từ một gói <code>.enc.json</code> đã tải xuống. Tệp giải mã chỉ được tạo sau khi xác thực private key thành công.</p></section>
+<section class="tool-layout"><div class="card card-pad"><div class="eyebrow">Giải mã ngoại tuyến</div><h2 class="card-title" style="margin-top:9px">Chọn gói tin</h2><label id="drop" class="drop" for="f"><input id="f" type="file" accept=".json,.enc.json,application/json"><div><div class="drop-icon">⇧</div><strong>Kéo thả gói .enc.json vào đây</strong><span>hoặc bấm để chọn tệp đã tải về</span></div></label><div id="file-info" class="file-chip"></div><div class="field"><label for="pass">Passphrase mở private key</label><input class="input" type="password" id="pass" placeholder="Nhập passphrase bảo vệ private key"></div><div id="status" class="notice" role="status"></div><button id="go" class="btn btn-primary" style="width:100%;margin-top:18px;padding:13px" onclick="decryptFile()">◈　Giải mã & tải tài liệu</button><pre id="out" class="tool-result" style="margin-top:16px"></pre></div>
+<div class="card card-pad" style="margin-top:16px"><div class="security-item"><span class="sec-icon">◇</span><div><b>Kiểm tra xác thực AES-GCM</b><small>Nội dung bị sửa đổi sẽ không giải mã thành công.</small></div></div></div></section></main><footer class="footer">AETHER VAULT · Private key không rời máy chủ</footer>
+<script>const f=document.querySelector('#f'),drop=document.querySelector('#drop'),statusBox=document.querySelector('#status'),button=document.querySelector('#go'),out=document.querySelector('#out');function status(t,c){statusBox.textContent=t;statusBox.className='notice show '+c}f.onchange=()=>{const x=f.files[0];if(x){const i=document.querySelector('#file-info');i.textContent='◈  '+x.name+' · '+(x.size/1024).toFixed(1)+' KB';i.classList.add('show')}};for(const ev of ['dragover','dragenter'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')});for(const ev of ['dragleave','drop'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length){f.files=e.dataTransfer.files;f.dispatchEvent(new Event('change'))}});async function decryptFile(){if(!f.files[0])return status('Hãy chọn gói mã hóa trước.','error');button.disabled=true;button.textContent='Đang xác thực & giải mã…';out.classList.remove('show');try{const pkg=JSON.parse(await f.files[0].text());if(!pkg.encKey||!pkg.iv||!pkg.data)throw Error('Tệp này không phải gói mã hóa hợp lệ.');const r=await fetch('/api/decrypt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pkg,passphrase:document.querySelector('#pass').value})});const j=await r.json();if(!r.ok)throw Error(j.error||'Giải mã thất bại');const data=Uint8Array.from(atob(j.data),c=>c.charCodeAt(0));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=j.filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);status('Giải mã thành công. Tài liệu đã được tải xuống.','ok');out.textContent='Tên tệp: '+j.filename+'\nKích thước: '+data.length.toLocaleString('vi-VN')+' byte\nXác thực AES-GCM: thành công';out.classList.add('show')}catch(e){status(e.message,'error')}finally{button.disabled=false;button.innerHTML='◈　Giải mã & tải tài liệu'}}</script></body></html>
