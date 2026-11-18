@@ -19,6 +19,7 @@ function ask(prompt, hidden = false) {
     const finish = error => {
       input.removeListener('keypress', onKey);
       input.setRawMode(false);
+      input.pause();
       output.write('\n');
       error ? reject(error) : resolve(value.trim());
     };
