@@ -194,10 +194,16 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/my-inbox') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên xem được hộp thư nhận' });
-      const list = fs.readdirSync(DATA_DIR).filter(f => /^\d+-[a-f0-9]+\.json$/.test(f)).map(f => {
-        const { data, ...meta } = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f)));
-        return { ...meta, size: data.length };
-      }).filter(pkg => pkg.recipientRole === 'employee' && (!pkg.targetUser || pkg.targetUser === sess.username))
+      const allPkgs = fs.readdirSync(DATA_DIR).filter(f => /^\d+-[a-f0-9]+\.json$/.test(f))
+        .map(f => JSON.parse(fs.readFileSync(path.join(DATA_DIR, f))));
+      const byId = new Map(allPkgs.map(p => [p.id, p]));
+      const list = allPkgs
+        .filter(pkg => pkg.recipientRole === 'employee' && (!pkg.targetUser || pkg.targetUser === sess.username))
+        .map(({ data, ...meta }) => {
+          const orig = meta.replyTo ? byId.get(meta.replyTo) : null;
+          const replyToDoc = orig ? { id: orig.id, title: orig.title, filename: orig.filename, category: orig.category, time: orig.time } : null;
+          return { ...meta, size: data.length, replyToDoc };
+        })
         .sort((a, b) => b.time.localeCompare(a.time));
       return send(res, 200, list);
     }
