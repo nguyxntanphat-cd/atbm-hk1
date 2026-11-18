@@ -48,6 +48,7 @@
         <label for="pass">Passphrase mở Private Key</label>
         <div style="display:flex;gap:8px">
           <input class="input" type="password" id="pass" placeholder="Nhập passphrase đã cấu hình">
+          <button type="button" class="btn btn-sm" onclick="fillSavedPassphrase()">Điền passphrase đã lưu</button>
         </div>
       </div>
 
@@ -77,6 +78,18 @@ const out = document.querySelector('#out');
 function status(t, c) {
   statusBox.textContent = t;
   statusBox.className = 'notice show ' + c;
+}
+
+async function fillSavedPassphrase() {
+  try {
+    const response = await fetch('/api/key-passphrase');
+    const result = await response.json();
+    if (!response.ok) throw Error(result.error || 'Không lấy được passphrase');
+    document.querySelector('#pass').value = result.passphrase;
+    status('Đã điền passphrase.', 'ok');
+  } catch (error) {
+    status(error.message, 'error');
+  }
 }
 
 f.onchange = async () => {

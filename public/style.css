@@ -322,6 +322,36 @@ main.shell {
   cursor: not-allowed;
 }
 
+.refresh-button .refresh-icon {
+  display: inline-block;
+  font-size: 1.25em;
+  line-height: 0.8;
+}
+
+.refresh-button.is-refreshing .refresh-icon {
+  animation: inbox-refresh-spin 0.65s linear infinite;
+}
+
+.refresh-button.is-refreshed {
+  color: var(--ok-text);
+  background: var(--ok-bg);
+  border-color: var(--ok-border);
+}
+
+.refresh-button.is-refresh-failed {
+  color: var(--err-text);
+  background: var(--err-bg);
+  border-color: var(--err-border);
+}
+
+@keyframes inbox-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-button.is-refreshing .refresh-icon { animation: none; }
+}
+
 /* Notices & logs */
 .notice {
   display: none;
@@ -554,6 +584,23 @@ tbody tr:hover {
   margin: 0 0 20px;
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+.quick-login {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.quick-login h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.quick-login-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 @media (max-width: 760px) {

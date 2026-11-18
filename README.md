@@ -29,6 +29,8 @@ node accounts-cli.js
 
 Chọn user hoặc admin rồi nhập họ tên, tên tài khoản, số điện thoại, email và mật khẩu. Mật khẩu được băm bằng scrypt trước khi lưu vào `storage/accounts.json`; mật khẩu không hiển thị khi nhập trong terminal tương tác.
 
+Đăng nhập nhanh là tùy chọn và đọc cấu hình local từ `storage/quick-logins.json`. Tệp này nằm trong thư mục bị Git bỏ qua; có thể thêm các mục gồm `id`, `label`, `username` và `password` để hiện nút đăng nhập tương ứng. Không đưa mật khẩu vào mã nguồn hoặc commit tệp này.
+
 Sau khi đăng nhập, nhân viên dùng `/` để xem tổng quan, `/send` để gửi tài liệu và `/history` để xem lịch sử. Admin dùng `/admin`, `/activity`, `/accounts` và `/tool`.
 
 ## Chức năng

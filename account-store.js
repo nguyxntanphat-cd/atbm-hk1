@@ -111,7 +111,11 @@ function remove(dataDir, username) {
 function logActivity(dataDir, actor, role, action, detail) {
   const file = activityFile(dataDir);
   let events = [];
-  try { events = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* nhật ký chưa có */ }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (Array.isArray(parsed)) events = parsed;
+    else if (parsed && Array.isArray(parsed.value)) events = parsed.value;
+  } catch { /* nhật ký chưa có hoặc không hợp lệ */ }
   events.push({ id: crypto.randomBytes(8).toString('hex'), time: new Date().toISOString(), actor, role, action, detail });
   fs.writeFileSync(file, JSON.stringify(events.slice(-5000), null, 2));
 }
