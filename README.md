@@ -29,4 +29,6 @@ Sau khi đăng nhập, nhân viên dùng `/` để xem tổng quan, `/send` đ�
 - Tải gói `.enc.json` và giải mã bằng công cụ quản trị riêng.
 - Xóa gói mã hóa khỏi hộp thư.
 
-Các gói mã hóa và nhật ký hoạt động được lưu trong `storage/`. Khóa RSA để bọc khóa AES nằm trong `keystore/receiver/` và `keystore/sender/`; private key của người nhận không được gửi tới trình duyệt. Khóa công khai xác minh chữ ký nằm trong `keystore/signers/`. Mỗi tài khoản ký số trên trình duyệt đã đăng ký khóa; xóa dữ liệu trình duyệt đồng nghĩa mất khóa bí mật và cần quy trình cấp lại khóa để gửi tiếp.
+Gói gửi được lưu dưới dạng mã trong `storage/sent.json`; khi tới hộp thư nhận, bản mã được lưu riêng trong `storage/received.json`. Sau khi giải mã, hồ sơ nhận được cập nhật thời điểm giải mã và trạng thái xác minh chữ ký. Mỗi gói mang nhãn người gửi `[employee]` hoặc `[boss]`. Nhật ký hoạt động vẫn nằm riêng trong `storage/activity.json`. Khi khởi động, các gói kiểu cũ đang nằm thành từng file được chuyển vào `sent.json`.
+
+Khóa RSA để bọc khóa AES nằm trong `keystore/receiver/` và `keystore/sender/`; private key của người nhận không được gửi tới trình duyệt. Khóa công khai xác minh chữ ký nằm trong `keystore/signers/`. Mỗi tài khoản ký số trên trình duyệt đã đăng ký khóa; xóa dữ liệu trình duyệt đồng nghĩa mất khóa bí mật và cần quy trình cấp lại khóa để gửi tiếp. Bản demo hiện mã hóa mọi gói gửi tới public key của Boss.

@@ -6,7 +6,7 @@ const signedContent = (filename, meta, encKey, iv, data) => JSON.stringify([
   filename, meta.sender || '', meta.title || '', meta.category || '', encKey, iv, data
 ]);
 
-// The signing private key stays in this employee's browser. The server only keeps
+// The signing private key stays in this user's browser. The server only keeps
 // the registered public key needed to verify uploaded packages.
 async function getSigningPrivateKey() {
   const me = await (await fetch('/api/me')).json();

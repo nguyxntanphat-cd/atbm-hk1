@@ -10,6 +10,8 @@ const receiver = require('./receiver');
 
 const PORT = 3000;
 const DATA_DIR = path.join(__dirname, 'storage');      // chỉ chứa bản MÃ HOÁ
+const SENT_FILE = path.join(DATA_DIR, 'sent.json');
+const RECEIVED_FILE = path.join(DATA_DIR, 'received.json');
 const AUDIT_FILE = path.join(DATA_DIR, 'activity.json');
 const SIGNER_KEYS_DIR = path.join(__dirname, 'keystore', 'signers');
 const PASSPHRASE = process.env.BOSS_PASS || 'boss123';  // passphrase bảo vệ private key
@@ -21,6 +23,44 @@ const USERS = {
   boss: { pass: 'admin123', role: 'boss', name: 'Boss' }
 };
 const sessions = new Map();
+
+function readPackages(file) {
+  try {
+    const packages = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!Array.isArray(packages)) throw new Error(`Kho dữ liệu không hợp lệ: ${path.basename(file)}`);
+    return packages;
+  } catch (e) {
+    if (e.code === 'ENOENT') return [];
+    throw e;
+  }
+}
+function writePackages(file, packages) {
+  fs.writeFileSync(file, JSON.stringify(packages));
+}
+function senderTag(role) {
+  return role === 'boss' ? '[boss]' : '[employee]';
+}
+function migrateLegacyPackages() {
+  const legacyFiles = fs.readdirSync(DATA_DIR).filter(f => /^\d+-[a-f0-9]+\.json$/i.test(f));
+  if (!legacyFiles.length) return;
+  const packages = readPackages(SENT_FILE);
+  const known = new Set(packages.map(p => p.id));
+  for (const file of legacyFiles) {
+    const pkg = JSON.parse(fs.readFileSync(path.join(DATA_DIR, file), 'utf8'));
+    const role = USERS[pkg.owner]?.role || 'employee';
+    if (!known.has(pkg.id)) {
+      packages.push({ ...pkg, senderRole: role, senderTag: senderTag(role) });
+      known.add(pkg.id);
+    }
+  }
+  writePackages(SENT_FILE, packages);
+  // Delete legacy per-package files only after their contents are in sent.json.
+  for (const file of legacyFiles) fs.unlinkSync(path.join(DATA_DIR, file));
+}
+for (const file of [SENT_FILE, RECEIVED_FILE]) {
+  if (!fs.existsSync(file)) writePackages(file, []);
+}
+migrateLegacyPackages();
 
 function readAudit() {
   try { return JSON.parse(fs.readFileSync(AUDIT_FILE, 'utf8')); }
@@ -111,7 +151,7 @@ http.createServer(async (req, res) => {
     if (req.method === 'GET' && pages[url.pathname]) {
       if (!sess) return redirect(res, '/login');
       if ((url.pathname === '/admin' || url.pathname === '/tool' || url.pathname === '/activity') && sess.role !== 'boss') return redirect(res, '/login');
-      if ((url.pathname === '/history' || url.pathname === '/send') && sess.role !== 'employee') return redirect(res, '/admin');
+      if (url.pathname === '/history' && sess.role !== 'employee') return redirect(res, '/admin');
       if (url.pathname === '/' && sess.role !== 'employee') return redirect(res, '/admin');
       return send(res, 200, fs.readFileSync(path.join(__dirname, 'public', pages[url.pathname])), 'text/html; charset=utf-8');
     }
@@ -130,13 +170,13 @@ http.createServer(async (req, res) => {
     // This endpoint registers only the public key, once per account.
     if (url.pathname === '/api/signing-key' && req.method === 'GET') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
-      if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên có khóa ký số' });
+      if (!USERS[sess.username]) return send(res, 403, { error: 'Tài khoản không được phép ký số' });
       const file = signerKeyPath(sess.username);
       return send(res, 200, { publicKey: fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null });
     }
     if (url.pathname === '/api/signing-key' && req.method === 'POST') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
-      if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên có khóa ký số' });
+      if (!USERS[sess.username]) return send(res, 403, { error: 'Tài khoản không được phép ký số' });
       const { publicKey } = await readBody(req);
       let key;
       try { key = crypto.createPublicKey(publicKey); }
@@ -154,7 +194,7 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/upload' && req.method === 'POST') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       const p = await readBody(req);
-      if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên được gửi tài liệu' });
+      if (!USERS[sess.username]) return send(res, 403, { error: 'Tài khoản không được phép gửi tài liệu' });
       if (!p.encKey || !p.iv || !p.data || !p.signature) return send(res, 400, { error: 'Gói tin thiếu chữ ký số hoặc dữ liệu mã hóa' });
       if (p.sender !== sess.name) return send(res, 400, { error: 'Tên người gửi phải khớp tài khoản đăng nhập' });
       const signedPackage = { ...p, owner: sess.username };
@@ -162,9 +202,16 @@ http.createServer(async (req, res) => {
         if (!verifyPackageSignature(signedPackage)) return send(res, 400, { error: 'Chữ ký số không hợp lệ hoặc khóa công khai chưa đăng ký' });
       } catch { return send(res, 400, { error: 'Không thể xác minh chữ ký số' }); }
       const id = Date.now() + '-' + crypto.randomBytes(3).toString('hex');
-      const pkg = { id, sender: p.sender || sess.name, title: p.title, category: p.category, filename: p.filename,
+      const pkg = { id, sender: sess.name, senderRole: sess.role, senderTag: senderTag(sess.role), title: p.title, category: p.category, filename: p.filename,
         owner: sess.username, time: new Date().toISOString(), encKey: p.encKey, iv: p.iv, data: p.data, signature: p.signature };
-      fs.writeFileSync(path.join(DATA_DIR, id + '.json'), JSON.stringify(pkg));
+      const sent = readPackages(SENT_FILE);
+      sent.push(pkg);
+      writePackages(SENT_FILE, sent);
+      const recipient = Object.entries(USERS).find(([, user]) => user.role === 'boss');
+      const received = readPackages(RECEIVED_FILE);
+      received.push({ ...pkg, receivedBy: recipient?.[0] || 'boss', receivedRole: 'boss',
+        receivedAt: new Date().toISOString(), signatureStatus: 'pending' });
+      writePackages(RECEIVED_FILE, received);
       logActivity(sess.name, sess.role, 'upload', `${pkg.filename || 'Tài liệu'} · ${pkg.title || pkg.category || ''}`);
       return send(res, 200, { ok: true, id });
     }
@@ -172,18 +219,16 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/list') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền truy cập' });
-      const list = fs.readdirSync(DATA_DIR).filter(f => /^\d+-[a-f0-9]+\.json$/.test(f)).map(f => {
-        const { data, ...meta } = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f)));
-        return { ...meta, size: data.length };
-      }).sort((a, b) => b.time.localeCompare(a.time));
+      const list = readPackages(SENT_FILE).map(({ data, ...meta }) => ({ ...meta, size: data.length }))
+        .sort((a, b) => b.time.localeCompare(a.time));
       return send(res, 200, list);
     }
 
     if (url.pathname === '/api/my-documents') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên xem được lịch sử cá nhân' });
-      const list = fs.readdirSync(DATA_DIR).filter(f => /^\d+-[a-f0-9]+\.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(path.join(DATA_DIR, f))))
-        .filter(pkg => pkg.owner === sess.username).map(({ data, encKey, iv, ...meta }) => ({ ...meta, size: data.length }))
+      const list = readPackages(SENT_FILE).filter(pkg => pkg.owner === sess.username)
+        .map(({ data, encKey, iv, signature, ...meta }) => ({ ...meta, size: data.length }))
         .sort((a, b) => b.time.localeCompare(a.time));
       return send(res, 200, list);
     }
@@ -200,12 +245,22 @@ http.createServer(async (req, res) => {
       return send(res, 200, readAudit().slice().reverse());
     }
 
+    if (url.pathname === '/api/received') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền xem dữ liệu đã nhận' });
+      const list = readPackages(RECEIVED_FILE).map(({ data, encKey, iv, signature, ...meta }) => ({ ...meta, size: data.length }))
+        .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+      return send(res, 200, list);
+    }
+
     if (url.pathname === '/api/raw') { // tải bản mã gốc
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền truy cập' });
       const id = path.basename(url.searchParams.get('id') || '');
+      const pkg = readPackages(SENT_FILE).find(p => p.id === id);
+      if (!pkg) return send(res, 404, { error: 'Không tìm thấy tài liệu' });
       res.setHeader('Content-Disposition', `attachment; filename="${id}.enc.json"`);
-      return send(res, 200, fs.readFileSync(path.join(DATA_DIR, id + '.json')));
+      return send(res, 200, pkg);
     }
 
     if (url.pathname === '/api/delete' && req.method === 'POST') {
@@ -214,11 +269,12 @@ http.createServer(async (req, res) => {
       const { id: requestedId } = await readBody(req);
       const id = path.basename(String(requestedId || ''));
       if (!/^\d+-[a-f0-9]+$/.test(id)) return send(res, 400, { error: 'Mã tài liệu không hợp lệ' });
-      const target = path.join(DATA_DIR, id + '.json');
-      if (!fs.existsSync(target)) return send(res, 404, { error: 'Không tìm thấy tài liệu' });
-      const removed = JSON.parse(fs.readFileSync(target, 'utf8'));
+      const sent = readPackages(SENT_FILE);
+      const removed = sent.find(p => p.id === id);
+      if (!removed) return send(res, 404, { error: 'Không tìm thấy tài liệu' });
       logActivity(sess.name, sess.role, 'delete', `${removed.filename || id} · ${removed.title || ''}`);
-      fs.unlinkSync(target);
+      writePackages(SENT_FILE, sent.filter(p => p.id !== id));
+      writePackages(RECEIVED_FILE, readPackages(RECEIVED_FILE).filter(p => p.id !== id));
       return send(res, 200, { ok: true });
     }
 
@@ -227,7 +283,8 @@ http.createServer(async (req, res) => {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền giải mã' });
       const b = await readBody(req);
-      const pkg = b.pkg || JSON.parse(fs.readFileSync(path.join(DATA_DIR, path.basename(b.id) + '.json')));
+      const pkg = b.pkg || readPackages(SENT_FILE).find(p => p.id === path.basename(b.id || ''));
+      if (!pkg) return send(res, 404, { error: 'Không tìm thấy gói dữ liệu' });
       try {
         let signatureStatus = 'unsigned';
         if (pkg.signature) {
@@ -235,6 +292,12 @@ http.createServer(async (req, res) => {
           signatureStatus = 'verified';
         }
         const plain = receiver.decryptPackage(pkg, b.passphrase);
+        const received = readPackages(RECEIVED_FILE);
+        const receivedIndex = received.findIndex(item => item.id === pkg.id && item.receivedBy === sess.username);
+        if (receivedIndex >= 0) received[receivedIndex] = { ...received[receivedIndex], signatureStatus, decryptedAt: new Date().toISOString() };
+        else received.push({ ...pkg, receivedBy: sess.username, receivedRole: sess.role,
+          receivedAt: new Date().toISOString(), decryptedAt: new Date().toISOString(), signatureStatus });
+        writePackages(RECEIVED_FILE, received);
         logActivity(sess.name, sess.role, 'decrypt', `${pkg.filename || 'Tài liệu'} · ${pkg.title || ''}`);
         return send(res, 200, { filename: pkg.filename, data: plain.toString('base64'), signatureStatus });
       } catch (e) { return send(res, 401, { error: 'Giải mã thất bại: sai passphrase/khoá hoặc dữ liệu bị sửa đổi' }); }
