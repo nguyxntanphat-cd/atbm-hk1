@@ -37,12 +37,17 @@
         <h2>Danh sách gói tin mã hóa (<span id="total">0</span> gói · đã mở <span id="unlocked">0</span>)</h2>
         <p>Nhập passphrase bảo vệ Private Key để giải mã thủ công hoặc bật tự động giải mã.</p>
       </div>
-      <button class="btn btn-sm" onclick="load()">Làm mới</button>
+      <button id="refresh-inbox" class="btn btn-sm refresh-button" type="button" onclick="refreshInbox()" aria-live="polite">
+        <span class="refresh-icon" aria-hidden="true">↻</span>
+        <span class="refresh-label">Làm mới</span>
+      </button>
     </div>
 
     <div class="key-bar">
       <label for="pass">Passphrase mở Private Key:</label>
       <input class="input" type="password" id="pass" placeholder="Nhập passphrase đã cấu hình">
+      <button type="button" class="btn btn-sm" onclick="fillSavedPassphrase()">Điền passphrase đã lưu</button>
+      <span id="passphrase-status" class="muted" role="status"></span>
       <label class="checkbox-label">
         <input id="auto" type="checkbox">
         <span>Tự động giải mã khi có tài liệu mới</span>
@@ -96,6 +101,20 @@ const $ = s => document.querySelector(s), cache = {}, state = { list: [] };
 $('#pass').value = sessionStorage.aetherPass || '';
 $('#auto').checked = sessionStorage.aetherAuto === '1';
 $('#pass').onchange = () => sessionStorage.aetherPass = $('#pass').value;
+async function fillSavedPassphrase() {
+  const status = $('#passphrase-status');
+  try {
+    const response = await fetch('/api/key-passphrase');
+    const result = await response.json();
+    if (!response.ok) throw Error(result.error || 'Không lấy được passphrase');
+    $('#pass').value = result.passphrase;
+    sessionStorage.aetherPass = result.passphrase;
+    status.textContent = 'Đã điền passphrase.';
+    if ($('#auto').checked) load();
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
 $('#auto').onchange = () => {
   sessionStorage.aetherAuto = $('#auto').checked ? '1' : '';
   if ($('#auto').checked && $('#pass').value) load();
@@ -205,7 +224,7 @@ function render() {
   $('#total').textContent = state.list.length;
   $('#unlocked').textContent = Object.keys(cache).length;
 }
-async function load() {
+async function load({ autoDecrypt = true } = {}) {
   try {
     const r = await fetch('/api/list');
     if (!r.ok) throw Error('Không tải được danh sách hộp thư');
@@ -215,7 +234,7 @@ async function load() {
     $('#category').innerHTML = '<option value="">Tất cả loại tài liệu</option>' + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
     $('#category').value = current;
     render();
-    if ($('#auto').checked && $('#pass').value) {
+    if (autoDecrypt && $('#auto').checked && $('#pass').value) {
       for (const m of state.list) {
         if (!cache[m.id]) {
           try { await dec(m.id); } catch {}
@@ -223,8 +242,51 @@ async function load() {
       }
       render();
     }
+    return true;
   } catch (e) {
     console.error(e);
+    return false;
+  }
+}
+let refreshResetTimer;
+async function refreshInbox() {
+  const button = $('#refresh-inbox');
+  const label = button.querySelector('.refresh-label');
+  clearTimeout(refreshResetTimer);
+  button.disabled = true;
+  button.classList.remove('is-refreshed', 'is-refresh-failed');
+  button.classList.add('is-refreshing');
+  label.textContent = 'Đang tải…';
+
+  const startedAt = performance.now();
+  let succeeded = false;
+  try {
+    $('#pass').value = '';
+    sessionStorage.removeItem('aetherPass');
+    $('#auto').checked = false;
+    sessionStorage.removeItem('aetherAuto');
+    $('#search').value = '';
+    $('#category').value = '';
+    $('#sort').value = 'new';
+    Object.keys(cache).forEach(id => delete cache[id]);
+    closePreview();
+    $('#preview-title').textContent = 'Nội dung sau giải mã';
+    $('#view').textContent = '';
+    render();
+    succeeded = await load({ autoDecrypt: false });
+  } catch (error) {
+    console.error(error);
+  } finally {
+    const remainingSpin = 650 - (performance.now() - startedAt);
+    if (remainingSpin > 0) await new Promise(resolve => setTimeout(resolve, remainingSpin));
+    button.classList.remove('is-refreshing');
+    button.classList.add(succeeded ? 'is-refreshed' : 'is-refresh-failed');
+    label.textContent = succeeded ? 'Đã làm mới' : 'Tải thất bại';
+    button.disabled = false;
+    refreshResetTimer = setTimeout(() => {
+      button.classList.remove('is-refreshed', 'is-refresh-failed');
+      label.textContent = 'Làm mới';
+    }, 1500);
   }
 }
 load();

@@ -25,9 +25,55 @@
       <button id="submit" class="btn btn-primary" type="submit" style="width:100%;margin-top:8px">Đăng nhập</button>
     </form>
 
+    <section id="quick-logins" class="quick-login" hidden>
+      <h2>Đăng nhập nhanh</h2>
+      <div id="quick-login-buttons" class="quick-login-buttons"></div>
+    </section>
+
   </section>
 </main>
 <script>
+const quickLoginBox = document.querySelector('#quick-logins');
+const quickLoginButtons = document.querySelector('#quick-login-buttons');
+
+async function loadQuickLogins() {
+  try {
+    const response = await fetch('/api/quick-logins');
+    if (!response.ok) return;
+    const entries = await response.json();
+    if (!entries.length) return;
+    quickLoginBox.hidden = false;
+    entries.forEach(entry => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-sm';
+      button.textContent = entry.label;
+      button.addEventListener('click', () => quickLogin(entry.id, button));
+      quickLoginButtons.append(button);
+    });
+  } catch { /* Quick login is optional. */ }
+}
+
+async function quickLogin(id, button) {
+  const err = document.querySelector('#err');
+  button.disabled = true;
+  err.className = 'notice error';
+  try {
+    const response = await fetch('/api/quick-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    const result = await response.json();
+    if (!response.ok) throw Error(result.error || 'Đăng nhập nhanh thất bại');
+    location.href = result.redirect;
+  } catch (error) {
+    err.textContent = error.message;
+    err.className = 'notice error show';
+    button.disabled = false;
+  }
+}
+
 async function login(e) {
   e.preventDefault();
   const b = document.querySelector('#submit');
@@ -54,6 +100,8 @@ async function login(e) {
     b.textContent = 'Đăng nhập';
   }
 }
+
+loadQuickLogins();
 </script>
 </body>
 </html>

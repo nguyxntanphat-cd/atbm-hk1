@@ -12,6 +12,8 @@ const accountStore = require('./account-store');
 const PORT = 3000;
 const DATA_DIR = path.join(__dirname, 'storage');      // chỉ chứa bản MÃ HOÁ
 const AUDIT_FILE = path.join(DATA_DIR, 'activity.json');
+const QUICK_LOGIN_FILE = path.join(DATA_DIR, 'quick-logins.json');
+const KEY_SETTINGS_FILE = path.join(DATA_DIR, 'key-settings.json');
 const PASSPHRASE = process.env.BOSS_PASS;  // passphrase bảo vệ private key
 fs.mkdirSync(DATA_DIR, { recursive: true });
 receiver.ensureKeys(PASSPHRASE);
@@ -19,8 +21,32 @@ accountStore.ensure(DATA_DIR);
 const sessions = new Map();
 
 function readAudit() {
-  try { return JSON.parse(fs.readFileSync(AUDIT_FILE, 'utf8')); }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(AUDIT_FILE, 'utf8'));
+    if (Array.isArray(parsed)) return parsed;
+    // Older PowerShell formatting wrapped the event array as { value, Count }.
+    if (parsed && Array.isArray(parsed.value)) return parsed.value;
+    return [];
+  }
   catch { return []; }
+}
+function readQuickLogins() {
+  try {
+    const entries = JSON.parse(fs.readFileSync(QUICK_LOGIN_FILE, 'utf8'));
+    if (!Array.isArray(entries)) return [];
+    return entries.filter(entry => entry && typeof entry.id === 'string' &&
+      typeof entry.label === 'string' && typeof entry.username === 'string' &&
+      typeof entry.password === 'string');
+  } catch { return []; }
+}
+function readKeyPassphrase() {
+  try {
+    const settings = JSON.parse(fs.readFileSync(KEY_SETTINGS_FILE, 'utf8'));
+    if (typeof settings.privateKeyPassphrase === 'string' && settings.privateKeyPassphrase) {
+      return settings.privateKeyPassphrase;
+    }
+  } catch { /* use the environment setting when present */ }
+  return PASSPHRASE || '';
 }
 function logActivity(actor, role, action, detail = '') {
   const events = readAudit();
@@ -79,6 +105,23 @@ http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ ok: true, role: u.role, name: u.name, redirect: u.role === 'boss' ? '/admin' : '/' }));
     }
 
+    if (url.pathname === '/api/quick-logins' && req.method === 'GET') {
+      return send(res, 200, readQuickLogins().map(({ id, label, username }) => ({ id, label, username })));
+    }
+
+    if (url.pathname === '/api/quick-login' && req.method === 'POST') {
+      const { id } = await readBody(req);
+      const entry = readQuickLogins().find(item => item.id === id);
+      if (!entry) return send(res, 404, { error: 'Không tìm thấy cấu hình đăng nhập nhanh' });
+      const u = accountStore.authenticate(DATA_DIR, entry.username, entry.password);
+      if (!u) return send(res, 401, { error: 'Tài khoản đăng nhập nhanh không còn hợp lệ' });
+      const sid = crypto.randomBytes(24).toString('hex');
+      sessions.set(sid, { username: u.username, role: u.role, name: u.name });
+      logActivity(u.name, u.role, 'quick_login', 'Đăng nhập nhanh');
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `sid=${sid}; Path=/; HttpOnly` });
+      return res.end(JSON.stringify({ ok: true, role: u.role, name: u.name, redirect: u.role === 'boss' ? '/admin' : '/' }));
+    }
+
     if (req.method === 'GET' && url.pathname === '/logout') {
       const m = (req.headers.cookie || '').match(/(?:^|;\s*)sid=([^;]+)/);
       if (m) {
@@ -92,6 +135,14 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/me') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       return send(res, 200, sess);
+    }
+
+    if (url.pathname === '/api/key-passphrase' && req.method === 'GET') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền truy cập passphrase' });
+      const passphrase = readKeyPassphrase();
+      if (!passphrase) return send(res, 404, { error: 'Chưa cấu hình passphrase local' });
+      return send(res, 200, { passphrase });
     }
 
     if (req.method === 'GET' && pages[url.pathname]) {
