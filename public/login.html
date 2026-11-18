@@ -15,7 +15,7 @@
     <form onsubmit="login(event)">
       <div class="field">
         <label for="username">Tên đăng nhập</label>
-        <input class="input" id="username" placeholder="nhanvien hoặc boss" autocomplete="username" required autofocus>
+        <input class="input" id="username" placeholder="Tên tài khoản" autocomplete="username" required autofocus>
       </div>
       <div class="field">
         <label for="password">Mật khẩu</label>
@@ -25,21 +25,9 @@
       <button id="submit" class="btn btn-primary" type="submit" style="width:100%;margin-top:8px">Đăng nhập</button>
     </form>
 
-    <div class="demo-accounts">
-      <div><strong>Chọn nhanh tài khoản demo (1 click):</strong></div>
-      <div class="demo-accounts-grid">
-        <button type="button" class="btn btn-sm" onclick="quickLogin('nhanvien','123456')">Nhân viên (nhanvien)</button>
-        <button type="button" class="btn btn-sm" onclick="quickLogin('boss','admin123')">Boss / Admin (boss)</button>
-      </div>
-    </div>
   </section>
 </main>
 <script>
-function quickLogin(u, p) {
-  document.querySelector('#username').value = u;
-  document.querySelector('#password').value = p;
-  document.querySelector('form').requestSubmit();
-}
 async function login(e) {
   e.preventDefault();
   const b = document.querySelector('#submit');

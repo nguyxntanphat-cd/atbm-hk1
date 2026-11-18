@@ -4,25 +4,39 @@
 
 ## Khởi chạy
 
+Tạo tài khoản admin đầu tiên bằng CLI trước khi đăng nhập:
+
 ```bash
+node accounts-cli.js
+```
+
+Đặt passphrase riêng cho private key trước lần chạy đầu tiên. PowerShell:
+
+```powershell
+$env:BOSS_PASS = 'thay-bang-passphrase-rieng'
 node server.js
 ```
 
+Trên macOS/Linux, dùng `BOSS_PASS='thay-bang-passphrase-rieng' node server.js`. Nếu cặp khóa đã tồn tại, server dùng khóa đó và không cần biến này để khởi động.
+
 Mở `http://localhost:3000/login`. Không dùng Live Server vì ứng dụng cần backend Node.js.
 
-Sau khi đăng nhập, nhân viên dùng `/` để xem tổng quan, `/send` để gửi tài liệu và `/history` để xem lịch sử. Admin dùng `/admin`, `/activity` và `/tool`.
+## Tạo tài khoản từ terminal
 
-## Tài khoản demo
+```bash
+node accounts-cli.js
+```
 
-- Nhân viên: `nhanvien` / `123456`
-- Quản trị viên: `boss` / `admin123`
-- Passphrase private key: `boss123` (có thể đặt qua biến môi trường `BOSS_PASS` trước lần sinh khóa đầu tiên)
+Chọn user hoặc admin rồi nhập họ tên, tên tài khoản, số điện thoại, email và mật khẩu. Mật khẩu được băm bằng scrypt trước khi lưu vào `storage/accounts.json`; mật khẩu không hiển thị khi nhập trong terminal tương tác.
+
+Sau khi đăng nhập, nhân viên dùng `/` để xem tổng quan, `/send` để gửi tài liệu và `/history` để xem lịch sử. Admin dùng `/admin`, `/activity`, `/accounts` và `/tool`.
 
 ## Chức năng
 
 - Nhân viên gửi tệp tối đa 18 MB, kéo thả, chọn danh mục và theo dõi các bước mã hóa.
 - Quản trị viên tìm kiếm/lọc/sắp xếp hộp thư, xem trước tệp văn bản, giải mã và tải tệp.
 - Nhật ký hoạt động: admin theo dõi đăng nhập thành công/thất bại, đăng xuất, gửi, giải mã và xóa; nhân viên chỉ xem lịch sử tài liệu và hoạt động của tài khoản mình.
+- Quản lý tài khoản ở `/accounts` có hai tab user/admin; admin có thể sửa thông tin liên hệ, khóa/mở khóa hoặc xóa tài khoản.
 - Xuất nhật ký hệ thống ra CSV để lưu trữ hoặc tổng hợp.
 - Tải gói `.enc.json` và giải mã bằng công cụ quản trị riêng.
 - Xóa gói mã hóa khỏi hộp thư.

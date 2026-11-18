@@ -14,6 +14,9 @@ function ensureKeys(passphrase) {
   fs.mkdirSync(RECV_DIR, { recursive: true });
   fs.mkdirSync(SEND_DIR, { recursive: true });
   if (fs.existsSync(PRIV)) return;
+  if (typeof passphrase !== 'string' || !passphrase) {
+    throw new Error('Hãy đặt biến môi trường BOSS_PASS trước khi tạo private key lần đầu.');
+  }
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
     publicKeyEncoding: { type: 'spki', format: 'pem' },
