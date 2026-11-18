@@ -11,6 +11,7 @@ const receiver = require('./receiver');
 const PORT = 3000;
 const DATA_DIR = path.join(__dirname, 'storage');      // chỉ chứa bản MÃ HOÁ
 const AUDIT_FILE = path.join(DATA_DIR, 'activity.json');
+const SIGNER_KEYS_DIR = path.join(__dirname, 'keystore', 'signers');
 const PASSPHRASE = process.env.BOSS_PASS || 'boss123';  // passphrase bảo vệ private key
 fs.mkdirSync(DATA_DIR, { recursive: true });
 receiver.ensureKeys(PASSPHRASE);
@@ -34,6 +35,24 @@ function logActivity(actor, role, action, detail = '') {
 function getSession(req) {
   const m = (req.headers.cookie || '').match(/(?:^|;\s*)sid=([^;]+)/);
   return m ? sessions.get(m[1]) || null : null;
+}
+
+function signerKeyPath(username) {
+  if (!/^[a-z0-9_-]+$/i.test(username || '')) throw new Error('Tài khoản không hợp lệ');
+  return path.join(SIGNER_KEYS_DIR, `${username}.pem`);
+}
+function packageSigningContent(pkg) {
+  return JSON.stringify([pkg.filename || '', pkg.sender || '', pkg.title || '', pkg.category || '', pkg.encKey, pkg.iv, pkg.data]);
+}
+function verifyPackageSignature(pkg) {
+  if (!pkg.signature || !pkg.owner) return false;
+  const keyFile = signerKeyPath(pkg.owner);
+  if (!fs.existsSync(keyFile)) return false;
+  return crypto.verify('sha256', Buffer.from(packageSigningContent(pkg)), {
+    key: fs.readFileSync(keyFile, 'utf8'),
+    padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+    saltLength: 32,
+  }, Buffer.from(pkg.signature, 'base64'));
 }
 
 const send = (res, code, body, type = 'application/json') => {
@@ -107,14 +126,44 @@ http.createServer(async (req, res) => {
       return send(res, 200, fs.readFileSync(receiver.PUB, 'utf8'), 'text/plain');
     }
 
+    // The employee creates and retains the private signing key in the browser.
+    // This endpoint registers only the public key, once per account.
+    if (url.pathname === '/api/signing-key' && req.method === 'GET') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên có khóa ký số' });
+      const file = signerKeyPath(sess.username);
+      return send(res, 200, { publicKey: fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null });
+    }
+    if (url.pathname === '/api/signing-key' && req.method === 'POST') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên có khóa ký số' });
+      const { publicKey } = await readBody(req);
+      let key;
+      try { key = crypto.createPublicKey(publicKey); }
+      catch { return send(res, 400, { error: 'Khóa công khai không hợp lệ' }); }
+      if (key.asymmetricKeyType !== 'rsa' || key.asymmetricKeyDetails.modulusLength < 2048)
+        return send(res, 400, { error: 'Khóa ký phải là RSA tối thiểu 2048 bit' });
+      fs.mkdirSync(SIGNER_KEYS_DIR, { recursive: true });
+      const file = signerKeyPath(sess.username);
+      if (fs.existsSync(file)) return send(res, 409, { error: 'Khóa công khai đã được đăng ký' });
+      fs.writeFileSync(file, key.export({ type: 'spki', format: 'pem' }), { flag: 'wx' });
+      return send(res, 201, { ok: true });
+    }
+
     // UC10/11 – Nhận & lưu gói mã hoá
     if (url.pathname === '/api/upload' && req.method === 'POST') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       const p = await readBody(req);
-      if (!p.encKey || !p.iv || !p.data) return send(res, 400, { error: 'Gói tin không hợp lệ' });
+      if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên được gửi tài liệu' });
+      if (!p.encKey || !p.iv || !p.data || !p.signature) return send(res, 400, { error: 'Gói tin thiếu chữ ký số hoặc dữ liệu mã hóa' });
+      if (p.sender !== sess.name) return send(res, 400, { error: 'Tên người gửi phải khớp tài khoản đăng nhập' });
+      const signedPackage = { ...p, owner: sess.username };
+      try {
+        if (!verifyPackageSignature(signedPackage)) return send(res, 400, { error: 'Chữ ký số không hợp lệ hoặc khóa công khai chưa đăng ký' });
+      } catch { return send(res, 400, { error: 'Không thể xác minh chữ ký số' }); }
       const id = Date.now() + '-' + crypto.randomBytes(3).toString('hex');
       const pkg = { id, sender: p.sender || sess.name, title: p.title, category: p.category, filename: p.filename,
-        owner: sess.username, time: new Date().toISOString(), encKey: p.encKey, iv: p.iv, data: p.data };
+        owner: sess.username, time: new Date().toISOString(), encKey: p.encKey, iv: p.iv, data: p.data, signature: p.signature };
       fs.writeFileSync(path.join(DATA_DIR, id + '.json'), JSON.stringify(pkg));
       logActivity(sess.name, sess.role, 'upload', `${pkg.filename || 'Tài liệu'} · ${pkg.title || pkg.category || ''}`);
       return send(res, 200, { ok: true, id });
@@ -180,9 +229,14 @@ http.createServer(async (req, res) => {
       const b = await readBody(req);
       const pkg = b.pkg || JSON.parse(fs.readFileSync(path.join(DATA_DIR, path.basename(b.id) + '.json')));
       try {
+        let signatureStatus = 'unsigned';
+        if (pkg.signature) {
+          if (!verifyPackageSignature(pkg)) return send(res, 400, { error: 'Chữ ký số không hợp lệ: tài liệu hoặc thông tin người gửi có thể đã bị sửa đổi' });
+          signatureStatus = 'verified';
+        }
         const plain = receiver.decryptPackage(pkg, b.passphrase);
         logActivity(sess.name, sess.role, 'decrypt', `${pkg.filename || 'Tài liệu'} · ${pkg.title || ''}`);
-        return send(res, 200, { filename: pkg.filename, data: plain.toString('base64') });
+        return send(res, 200, { filename: pkg.filename, data: plain.toString('base64'), signatureStatus });
       } catch (e) { return send(res, 401, { error: 'Giải mã thất bại: sai passphrase/khoá hoặc dữ liệu bị sửa đổi' }); }
     }
     send(res, 404, { error: 'Not found' });
