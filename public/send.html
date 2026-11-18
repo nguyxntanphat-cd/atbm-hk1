@@ -3,82 +3,95 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Nhân viên · Gửi tài liệu mã hóa</title>
+  <title>Gửi tài liệu · Aether Vault</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="shell topbar-inner">
+  <div class="topbar-inner">
     <a class="brand" href="/">
-      <span>Truyền tải dữ liệu nội bộ</span>
-      <span class="brand-role">Nhân viên (Bên gửi)</span>
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/></svg>
+      <span>Aether Vault</span>
+      <span class="brand-tag">Nhân viên · Bên gửi</span>
     </a>
-    <nav class="nav-bar">
-      <a class="nav-link active" href="/send">Gửi tài liệu</a>
-      <a class="nav-link" href="/history">Lịch sử đã gửi</a>
+    <nav class="nav-links" aria-label="Điều hướng">
+      <a class="active" href="/send">Gửi tài liệu</a>
+      <a href="/history">Lịch sử đã gửi</a>
     </nav>
-    <div class="user-actions">
+    <div class="user-bar">
       <span id="who">Nhân viên</span>
       <a class="btn btn-sm" href="/logout">Đăng xuất</a>
     </div>
   </div>
 </header>
 
-<main class="shell">
-  <div class="page-header">
-    <h1>Mã hóa và gửi tài liệu cho Boss</h1>
-    <p>Tệp được mã hóa bằng AES-256-GCM ngay trên trình duyệt, sau đó khóa AES được bọc bằng Public Key RSA-2048 của Boss trước khi gửi lên máy chủ.</p>
+<main class="container">
+  <div class="page-head">
+    <div>
+      <h1>Mã hóa và gửi tài liệu cho Boss</h1>
+      <p>Tệp được mã hóa bằng AES-256-GCM ngay trên trình duyệt, khóa AES được bọc bằng Public Key RSA-2048 từ <code>keystore/sender/</code>.</p>
+    </div>
+    <div class="meta-strip">
+      <span class="meta-item">AES-256-GCM</span>
+      <span class="meta-item">RSA-2048 OAEP</span>
+    </div>
   </div>
 
-  <div class="split-grid">
-    <section class="section-block">
-      <div class="section-head">
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head">
         <div>
           <h2>Thông tin tài liệu</h2>
           <p>Mỗi lần gửi sinh một khóa AES-256 và IV 96-bit mới.</p>
         </div>
       </div>
-
-      <div class="form-row">
-        <div class="field">
-          <label for="sender">Tên người gửi</label>
-          <input class="input" id="sender" placeholder="Tên nhân viên" maxlength="80">
+      <div class="panel-body">
+        <div class="form-row">
+          <div class="field">
+            <label for="sender">Người gửi</label>
+            <input class="input" id="sender" placeholder="Tên nhân viên" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="category">Loại tài liệu</label>
+            <select class="select" id="category">
+              <option>Báo cáo cấu trúc dự án</option>
+              <option>Tài liệu cần Boss ký</option>
+              <option>Hợp đồng & pháp lý</option>
+              <option>Tài chính</option>
+              <option>Khác</option>
+            </select>
+          </div>
         </div>
         <div class="field">
-          <label for="category">Loại tài liệu</label>
-          <select class="select" id="category">
-            <option>Báo cáo cấu trúc dự án</option>
-            <option>Tài liệu cần Boss ký</option>
-            <option>Hợp đồng & pháp lý</option>
-            <option>Tài chính</option>
-            <option>Khác</option>
-          </select>
+          <label for="title">Tiêu đề</label>
+          <input class="input" id="title" placeholder="Ví dụ: Báo cáo cấu trúc dự án học kỳ 1" maxlength="120">
         </div>
+        <div class="field">
+          <label for="file">Tệp đính kèm (tối đa 18 MB)</label>
+          <input class="file-input" type="file" id="file">
+        </div>
+        <div id="notice" class="notice" role="status"></div>
+        <button id="send-btn" class="btn btn-primary btn-block" onclick="go()">Mã hóa RSA + AES & Gửi</button>
       </div>
-
-      <div class="field">
-        <label for="title">Tiêu đề</label>
-        <input class="input" id="title" placeholder="Ví dụ: Báo cáo cấu trúc dự án học kỳ 1" maxlength="120">
-      </div>
-
-      <div class="field">
-        <label for="file">Tệp đính kèm (tối đa 18 MB)</label>
-        <input class="file-input" type="file" id="file">
-      </div>
-
-      <div id="notice" class="notice" role="status"></div>
-
-      <button id="send-btn" class="btn btn-primary" style="width:100%;margin-top:8px" onclick="go()">Mã hóa RSA + AES & Gửi</button>
     </section>
 
-    <section class="section-block">
-      <div class="section-head">
+    <section class="panel">
+      <div class="panel-head">
         <div>
-          <h2>Nhật ký quá trình mã hóa (Client-side)</h2>
-          <p>Hiển thị trực tiếp các bước thực thi trong <code>public/sender.js</code>.</p>
+          <h2>Nhật ký mã hóa phía client</h2>
+          <p>Từng bước thực thi trong <code>public/sender.js</code>.</p>
         </div>
       </div>
-      <pre id="log" class="log-box">Chưa có thao tác. Chọn tệp và bấm "Mã hóa RSA + AES & Gửi" để xem từng bước mã hóa.</pre>
+      <div class="panel-body">
+        <ol class="steps-line" id="pipeline">
+          <li data-step="1">1. Public Key</li>
+          <li data-step="2">2. Sinh AES</li>
+          <li data-step="3">3. Mã hóa tệp</li>
+          <li data-step="4">4. Bọc RSA</li>
+          <li data-step="5">5. Gửi gói</li>
+        </ol>
+        <pre id="log" class="log-box">Chưa có thao tác. Chọn tệp và bấm "Mã hóa RSA + AES & Gửi" để xem từng bước.</pre>
+      </div>
     </section>
   </div>
 </main>
@@ -86,6 +99,15 @@
 <script src="/sender.js"></script>
 <script>
 const $ = s => document.querySelector(s);
+let currentStep = 0;
+function markStep(n, failed) {
+  document.querySelectorAll('#pipeline li').forEach(el => {
+    const x = +el.dataset.step;
+    el.classList.toggle('done', x < n);
+    el.classList.toggle('active', x === n && !failed);
+    el.classList.toggle('fail', x === n && !!failed);
+  });
+}
 fetch('/api/me').then(r => r.ok ? r.json() : null).then(u => {
   if (u) {
     $('#who').textContent = u.name;
@@ -106,6 +128,8 @@ async function go() {
   btn.textContent = 'Đang mã hóa & gửi…';
   $('#notice').className = 'notice';
   $('#log').textContent = '';
+  currentStep = 1;
+  markStep(1);
   try {
     const meta = {
       sender: $('#sender').value.trim(),
@@ -114,11 +138,15 @@ async function go() {
     };
     await encryptAndSend(f, meta, line => {
       $('#log').textContent += line + '\n';
+      const m = line.match(/^(\d)\./);
+      if (m) { currentStep = +m[1] + 1; markStep(currentStep); }
     });
+    markStep(6);
     setNotice('Đã mã hóa và gửi gói tin thành công sang hộp thư Boss.', 'ok');
     $('#file').value = '';
     $('#title').value = '';
   } catch (e) {
+    markStep(currentStep, true);
     setNotice('Lỗi gửi tài liệu: ' + e.message, 'error');
   } finally {
     btn.disabled = false;

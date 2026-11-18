@@ -3,38 +3,42 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Lịch sử đã gửi · Truyền tải dữ liệu nội bộ</title>
+  <title>Lịch sử đã gửi · Aether Vault</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="shell topbar-inner">
+  <div class="topbar-inner">
     <a class="brand" href="/">
-      <span>Truyền tải dữ liệu nội bộ</span>
-      <span class="brand-role">Nhân viên (Bên gửi)</span>
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/></svg>
+      <span>Aether Vault</span>
+      <span class="brand-tag">Nhân viên · Bên gửi</span>
     </a>
-    <nav class="nav-bar">
-      <a class="nav-link" href="/">Gửi tài liệu</a>
-      <a class="nav-link active" href="/history">Lịch sử đã gửi</a>
+    <nav class="nav-links" aria-label="Điều hướng">
+      <a href="/">Gửi tài liệu</a>
+      <a class="active" href="/history">Lịch sử đã gửi</a>
     </nav>
-    <div class="user-actions">
+    <div class="user-bar">
       <span id="who">Nhân viên</span>
       <a class="btn btn-sm" href="/logout">Đăng xuất</a>
     </div>
   </div>
 </header>
 
-<main class="shell">
-  <div class="page-header">
-    <h1>Lịch sử gửi tài liệu và hoạt động cá nhân</h1>
-    <p>Tra cứu các gói tin đã mã hóa gửi lên hệ thống và lịch sử phiên đăng nhập của tài khoản.</p>
+<main class="container">
+  <div class="page-head">
+    <div>
+      <h1>Lịch sử gửi tài liệu và hoạt động cá nhân</h1>
+      <p>Tra cứu các gói tin đã mã hóa gửi lên hệ thống và nhật ký phiên đăng nhập của tài khoản.</p>
+    </div>
   </div>
 
-  <section class="section-block">
+  <section class="panel">
     <div class="tab-row">
-      <button class="tab active" data-tab="docs">Tài liệu đã gửi (<span id="doc-count">0</span>)</button>
-      <button class="tab" data-tab="events">Hoạt động tài khoản (<span id="event-count">0</span>)</button>
-      <button class="btn btn-sm" style="margin-left:auto" onclick="loadAll()">Làm mới</button>
+      <button class="tab active" data-tab="docs">Tài liệu đã gửi <span id="doc-count" class="tab-count">0</span></button>
+      <button class="tab" data-tab="events">Hoạt động tài khoản <span id="event-count" class="tab-count">0</span></button>
+      <span class="tab-spacer"></span>
+      <button class="btn btn-sm" onclick="loadAll()">Làm mới</button>
     </div>
 
     <div class="toolbar">
@@ -80,6 +84,7 @@ const $ = s => document.querySelector(s);
 let docs = [], events = [], tab = 'docs';
 const labels = {
   login: 'Đăng nhập',
+  quick_login: 'Đăng nhập nhanh',
   logout: 'Đăng xuất',
   login_failed: 'Đăng nhập thất bại',
   upload: 'Gửi tài liệu',

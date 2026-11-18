@@ -3,55 +3,175 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Đăng nhập · Truyền tải dữ liệu nội bộ (RSA + AES)</title>
+  <title>Đăng nhập · Aether Vault</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <main class="login-page">
+  <canvas id="particles" class="particle-canvas" aria-hidden="true"></canvas>
+
   <section class="login-box">
+    <div class="login-brand">
+      <span class="brand-icon"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/></svg></span>
+      <span>Aether Vault · Truyền tải nội bộ</span>
+    </div>
     <h1>Đăng nhập hệ thống</h1>
-    <p>Ứng dụng mã hóa RSA-OAEP và AES-256-GCM trong truyền tải dữ liệu nội bộ.</p>
+    <p>Mã hóa tệp bằng AES-256-GCM và bảo vệ khóa bằng RSA-2048 OAEP.</p>
 
     <form onsubmit="login(event)">
       <div class="field">
         <label for="username">Tên đăng nhập</label>
-        <input class="input" id="username" placeholder="Tên tài khoản" autocomplete="username" required autofocus>
+        <input class="input" id="username" placeholder="Nhập tên tài khoản" autocomplete="username" required autofocus>
       </div>
       <div class="field">
         <label for="password">Mật khẩu</label>
         <input class="input" id="password" type="password" placeholder="Nhập mật khẩu" autocomplete="current-password" required>
       </div>
       <div id="err" class="notice error" role="alert"></div>
-      <button id="submit" class="btn btn-primary" type="submit" style="width:100%;margin-top:8px">Đăng nhập</button>
+      <button id="submit" class="btn btn-primary btn-block" type="submit">Đăng nhập</button>
     </form>
 
-    <section id="quick-logins" class="quick-login" hidden>
-      <h2>Đăng nhập nhanh</h2>
-      <div id="quick-login-buttons" class="quick-login-buttons"></div>
+    <section id="quick-logins" class="quick-login">
+      <h2>Đăng nhập nhanh (Demo)</h2>
+      <div id="quick-login-buttons" class="quick-login-buttons">
+        <div class="quick-empty">Đang tải…</div>
+      </div>
     </section>
-
   </section>
 </main>
 <script>
-const quickLoginBox = document.querySelector('#quick-logins');
+// Interactive Constellation Particle Background
+(() => {
+  const canvas = document.querySelector('#particles');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const mouse = { x: -9999, y: -9999 };
+  let w = 0, h = 0, dpr = 1, nodes = [], rafId = 0;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth;
+    h = window.innerHeight;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const target = Math.min(85, Math.max(36, Math.floor((w * h) / 18000)));
+    nodes = Array.from({ length: target }, (_, i) => {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.45 + Math.random() * 0.65;
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: 2.2 + Math.random() * 2.0,
+        teal: i % 3 === 0
+      };
+    });
+  }
+
+  function frame() {
+    ctx.clearRect(0, 0, w, h);
+    const maxDist = 165;
+
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      a.x += a.vx;
+      a.y += a.vy;
+      if (a.x <= 0 || a.x >= w) a.vx *= -1;
+      if (a.y <= 0 || a.y >= h) a.vy *= -1;
+
+      const dxm = a.x - mouse.x;
+      const dym = a.y - mouse.y;
+      const dm = Math.hypot(dxm, dym);
+      if (dm < 170) {
+        const alphaMouse = (1 - dm / 170) * 0.35;
+        ctx.strokeStyle = `rgba(37, 99, 235, ${alphaMouse})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(mouse.x, mouse.y);
+        ctx.stroke();
+
+        if (dm < 110 && dm > 1) {
+          a.x += (dxm / dm) * 0.8;
+          a.y += (dym / dm) * 0.8;
+        }
+      }
+
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (dist < maxDist) {
+          const alpha = (1 - dist / maxDist) * 0.34;
+          ctx.strokeStyle = a.teal && b.teal
+            ? `rgba(13, 148, 136, ${alpha})`
+            : `rgba(37, 99, 235, ${alpha})`;
+          ctx.lineWidth = 1.1;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+
+      ctx.fillStyle = a.teal ? 'rgba(13, 148, 136, 0.72)' : 'rgba(37, 99, 235, 0.65)';
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (!document.hidden) {
+      rafId = requestAnimationFrame(frame);
+    }
+  }
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
+  window.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { cancelAnimationFrame(rafId); frame(); }
+  });
+
+  resize();
+  frame();
+})();
+
+// Auth & Quick Login
 const quickLoginButtons = document.querySelector('#quick-login-buttons');
+
+function quickEmpty(text) {
+  quickLoginButtons.innerHTML = '';
+  const note = document.createElement('div');
+  note.className = 'quick-empty';
+  note.textContent = text;
+  quickLoginButtons.append(note);
+}
 
 async function loadQuickLogins() {
   try {
     const response = await fetch('/api/quick-logins');
-    if (!response.ok) return;
+    if (!response.ok) return quickEmpty('Không tải được cấu hình đăng nhập nhanh.');
     const entries = await response.json();
-    if (!entries.length) return;
-    quickLoginBox.hidden = false;
+    if (!entries.length) return quickEmpty('Chưa có cấu hình trong storage/quick-logins.json.');
+    quickLoginButtons.innerHTML = '';
     entries.forEach(entry => {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'btn btn-sm';
-      button.textContent = entry.label;
+      button.className = 'quick-btn';
+      const label = document.createElement('b');
+      label.textContent = entry.label;
+      const user = document.createElement('small');
+      user.textContent = entry.username;
+      button.append(label, user);
       button.addEventListener('click', () => quickLogin(entry.id, button));
       quickLoginButtons.append(button);
     });
-  } catch { /* Quick login is optional. */ }
+  } catch {
+    quickEmpty('Không tải được cấu hình đăng nhập nhanh.');
+  }
 }
 
 async function quickLogin(id, button) {

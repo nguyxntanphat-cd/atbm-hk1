@@ -3,49 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Boss · Hộp thư giải mã tài liệu</title>
+  <title>Hộp thư giải mã · Aether Vault</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="shell topbar-inner">
+  <div class="topbar-inner">
     <a class="brand" href="/admin">
-      <span>Truyền tải dữ liệu nội bộ</span>
-      <span class="brand-role">Boss / Admin (Bên nhận)</span>
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/></svg>
+      <span>Aether Vault</span>
+      <span class="brand-tag">Boss · Bên nhận</span>
     </a>
-    <nav class="nav-bar">
-      <a class="nav-link active" href="/admin">Hộp thư đến</a>
-      <a class="nav-link" href="/tool">Công cụ giải mã</a>
-      <a class="nav-link" href="/activity">Nhật ký hệ thống</a>
-      <a class="nav-link" href="/accounts">Quản lý tài khoản</a>
+    <nav class="nav-links" aria-label="Điều hướng quản trị">
+      <a class="active" href="/admin">Hộp thư đến</a>
+      <a href="/tool">Công cụ giải mã</a>
+      <a href="/activity">Nhật ký hệ thống</a>
+      <a href="/accounts">Quản lý tài khoản</a>
     </nav>
-    <div class="user-actions">
+    <div class="user-bar">
+      <span id="who">Boss</span>
       <a class="btn btn-sm" href="/logout">Đăng xuất</a>
     </div>
   </div>
 </header>
 
-<main class="shell">
-  <div class="page-header">
-    <h1>Hộp thư nhận và giải mã tài liệu</h1>
-    <p>Giải mã khóa AES bằng Private Key RSA-2048 trong <code>keystore/receiver/boss_private.pem</code>, sau đó giải mã và kiểm tra toàn vẹn nội dung bằng AES-256-GCM.</p>
+<main class="container">
+  <div class="page-head">
+    <div>
+      <h1>Hộp thư nhận và giải mã tài liệu</h1>
+      <p>Khôi phục khóa AES bằng Private Key RSA-2048 trong <code>keystore/receiver/boss_private.pem</code>, sau đó giải mã và kiểm tra AuthTag AES-256-GCM.</p>
+    </div>
+    <div class="meta-strip">
+      <span class="meta-item">RSA-2048 Private Key</span>
+      <span class="meta-item">AES-256-GCM</span>
+    </div>
   </div>
 
-  <section class="section-block">
-    <div class="section-head">
+  <section class="panel">
+    <div class="panel-head">
       <div>
         <h2>Danh sách gói tin mã hóa (<span id="total">0</span> gói · đã mở <span id="unlocked">0</span>)</h2>
-        <p>Nhập passphrase bảo vệ Private Key để giải mã thủ công hoặc bật tự động giải mã.</p>
+        <p>Nhập passphrase bảo vệ Private Key để giải mã thủ công hoặc bật tự động giải mã khi có tài liệu mới.</p>
       </div>
       <button id="refresh-inbox" class="btn btn-sm refresh-button" type="button" onclick="refreshInbox()" aria-live="polite">
-        <span class="refresh-icon" aria-hidden="true">↻</span>
+        <span class="refresh-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2 5.3"/><path d="M20 4v7h-7"/></svg></span>
         <span class="refresh-label">Làm mới</span>
       </button>
     </div>
 
     <div class="key-bar">
-      <label for="pass">Passphrase mở Private Key:</label>
-      <input class="input" type="password" id="pass" placeholder="Nhập passphrase đã cấu hình">
+      <label for="pass">Passphrase Private Key:</label>
+      <input class="input" type="password" id="pass" placeholder="Nhập passphrase mở khóa">
       <button type="button" class="btn btn-sm" onclick="fillSavedPassphrase()">Điền passphrase đã lưu</button>
       <span id="passphrase-status" class="muted" role="status"></span>
       <label class="checkbox-label">
@@ -84,10 +92,10 @@
     </div>
 
     <section id="preview" class="preview">
-      <div class="section-head">
+      <div class="preview-head">
         <div>
           <h2 id="preview-title">Nội dung sau giải mã</h2>
-          <p>Dữ liệu đã được xác thực AuthTag AES-256-GCM.</p>
+          <p>Dữ liệu đã được xác thực AuthTag AES-256-GCM thông qua <code>receiver.js</code>.</p>
         </div>
         <button class="btn btn-sm" onclick="closePreview()">Đóng xem trước</button>
       </div>
@@ -96,8 +104,34 @@
   </section>
 </main>
 
+<dialog id="sign-dialog" class="account-dialog">
+  <form id="sign-form">
+    <h2>Ký & gửi trả tài liệu cho Nhân viên</h2>
+    <p class="dialog-sub">Tệp đã ký sẽ được mã hóa bằng Public Key RSA-2048 của Nhân viên trước khi gửi.</p>
+    <input type="hidden" id="reply-to-id">
+    <input type="hidden" id="reply-target-user">
+    <div class="field">
+      <label for="reply-title">Tiêu đề phản hồi</label>
+      <input class="input" id="reply-title" required maxlength="120">
+    </div>
+    <div class="field">
+      <label for="reply-file">Chọn tệp đã ký (ví dụ: ..._BOSS.docx)</label>
+      <input class="file-input" type="file" id="reply-file" required>
+    </div>
+    <div id="reply-notice" class="notice" role="status"></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn" onclick="document.querySelector('#sign-dialog').close()">Hủy</button>
+      <button id="reply-submit" class="btn btn-primary" type="submit">Mã hóa & Gửi trả Nhân viên</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/sender.js"></script>
 <script>
 const $ = s => document.querySelector(s), cache = {}, state = { list: [] };
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(u => {
+  if (u) $('#who').textContent = u.name;
+});
 $('#pass').value = sessionStorage.aetherPass || '';
 $('#auto').checked = sessionStorage.aetherAuto === '1';
 $('#pass').onchange = () => sessionStorage.aetherPass = $('#pass').value;
@@ -214,6 +248,7 @@ function render() {
         <div class="actions">
           <button class="btn btn-sm btn-primary" onclick="viewDoc('${esc(m.id)}')">Xem</button>
           <button class="btn btn-sm" onclick="saveDoc('${esc(m.id)}')">Lưu tệp</button>
+          <button class="btn btn-sm" onclick="openSignDialog('${esc(m.id)}','${esc(m.owner || 'nhanvien')}','${esc(m.title || m.filename)}')">Gửi bản đã ký</button>
           <a class="btn btn-sm" href="/api/raw?id=${encodeURIComponent(m.id)}">Bản mã (.json)</a>
           <button class="btn btn-sm btn-danger" onclick="removeDoc('${esc(m.id)}')">Xóa</button>
         </div>
@@ -289,6 +324,42 @@ async function refreshInbox() {
     }, 1500);
   }
 }
+function openSignDialog(id, owner, title) {
+  $('#reply-to-id').value = id;
+  $('#reply-target-user').value = owner || 'nhanvien';
+  $('#reply-title').value = 'Đã ký: ' + (title || 'Tài liệu');
+  $('#reply-file').value = '';
+  $('#reply-notice').className = 'notice';
+  $('#sign-dialog').showModal();
+}
+$('#sign-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = $('#reply-file').files[0];
+  const notice = $('#reply-notice');
+  const btn = $('#reply-submit');
+  if (!f) { notice.textContent = 'Vui lòng chọn tệp đã ký.'; notice.className = 'notice error show'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Đang mã hóa & gửi…';
+  notice.className = 'notice';
+  try {
+    await encryptAndSend(f, {
+      sender: $('#who').textContent || 'Boss',
+      title: $('#reply-title').value.trim() || f.name,
+      category: 'Tài liệu đã ký',
+      targetUser: $('#reply-target-user').value,
+      replyTo: $('#reply-to-id').value
+    }, () => {}, 'employee');
+    notice.textContent = 'Đã mã hóa và gửi trả tài liệu cho Nhân viên.';
+    notice.className = 'notice ok show';
+    setTimeout(() => $('#sign-dialog').close(), 800);
+  } catch (err) {
+    notice.textContent = 'Lỗi: ' + err.message;
+    notice.className = 'notice error show';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Mã hóa & Gửi trả Nhân viên';
+  }
+};
 load();
 setInterval(load, 8000);
 </script>

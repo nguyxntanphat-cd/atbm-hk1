@@ -3,36 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Nhật ký hệ thống · Boss / Admin</title>
+  <title>Nhật ký hệ thống · Aether Vault</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="shell topbar-inner">
+  <div class="topbar-inner">
     <a class="brand" href="/admin">
-      <span>Truyền tải dữ liệu nội bộ</span>
-      <span class="brand-role">Boss / Admin (Bên nhận)</span>
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/></svg>
+      <span>Aether Vault</span>
+      <span class="brand-tag">Boss · Bên nhận</span>
     </a>
-    <nav class="nav-bar">
-      <a class="nav-link" href="/admin">Hộp thư đến</a>
-      <a class="nav-link" href="/tool">Công cụ giải mã</a>
-      <a class="nav-link active" href="/activity">Nhật ký hệ thống</a>
-      <a class="nav-link" href="/accounts">Quản lý tài khoản</a>
+    <nav class="nav-links" aria-label="Điều hướng quản trị">
+      <a href="/admin">Hộp thư đến</a>
+      <a href="/tool">Công cụ giải mã</a>
+      <a class="active" href="/activity">Nhật ký hệ thống</a>
+      <a href="/accounts">Quản lý tài khoản</a>
     </nav>
-    <div class="user-actions">
+    <div class="user-bar">
+      <span id="who">Boss</span>
       <a class="btn btn-sm" href="/logout">Đăng xuất</a>
     </div>
   </div>
 </header>
 
-<main class="shell">
-  <div class="page-header">
-    <h1>Nhật ký hoạt động hệ thống (Audit Log)</h1>
-    <p>Ghi nhận các sự kiện đăng nhập, mã hóa gửi tài liệu, giải mã và xóa gói tin trên máy chủ.</p>
+<main class="container">
+  <div class="page-head">
+    <div>
+      <h1>Nhật ký hoạt động hệ thống (Audit Log)</h1>
+      <p>Ghi nhận các sự kiện đăng nhập, gửi gói mã hóa, giải mã, xóa tài liệu và quản lý tài khoản.</p>
+    </div>
   </div>
 
-  <section class="section-block">
-    <div class="section-head">
+  <section class="panel">
+    <div class="panel-head">
       <div>
         <h2>Danh sách sự kiện (<span id="count">0</span> sự kiện · thất bại <span id="failed">0</span>)</h2>
         <p>Mật khẩu và passphrase không bao giờ được lưu vào nhật ký.</p>
@@ -48,6 +52,7 @@
       <select id="action" class="select">
         <option value="">Tất cả hành động</option>
         <option value="login">Đăng nhập thành công</option>
+        <option value="quick_login">Đăng nhập nhanh</option>
         <option value="logout">Đăng xuất</option>
         <option value="login_failed">Đăng nhập thất bại</option>
         <option value="upload">Gửi tài liệu</option>
@@ -88,8 +93,12 @@
 <script>
 const $ = s => document.querySelector(s);
 let all = [];
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(u => {
+  if (u) $('#who').textContent = u.name;
+});
 const labels = {
   login: 'Đăng nhập',
+  quick_login: 'Đăng nhập nhanh',
   logout: 'Đăng xuất',
   login_failed: 'Đăng nhập thất bại',
   upload: 'Gửi tài liệu',

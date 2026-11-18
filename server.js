@@ -14,9 +14,10 @@ const DATA_DIR = path.join(__dirname, 'storage');      // chỉ chứa bản MÃ
 const AUDIT_FILE = path.join(DATA_DIR, 'activity.json');
 const QUICK_LOGIN_FILE = path.join(DATA_DIR, 'quick-logins.json');
 const KEY_SETTINGS_FILE = path.join(DATA_DIR, 'key-settings.json');
-const PASSPHRASE = process.env.BOSS_PASS;  // passphrase bảo vệ private key
+const PASSPHRASE = process.env.BOSS_PASS;  // passphrase bảo vệ private key Boss
+const EMP_PASSPHRASE = process.env.EMP_PASS || 'nv123'; // passphrase bảo vệ private key Nhân viên
 fs.mkdirSync(DATA_DIR, { recursive: true });
-receiver.ensureKeys(PASSPHRASE);
+receiver.ensureKeys(PASSPHRASE, EMP_PASSPHRASE);
 accountStore.ensure(DATA_DIR);
 const sessions = new Map();
 
@@ -139,6 +140,7 @@ http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/key-passphrase' && req.method === 'GET') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role === 'employee') return send(res, 200, { passphrase: EMP_PASSPHRASE });
       if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền truy cập passphrase' });
       const passphrase = readKeyPassphrase();
       if (!passphrase) return send(res, 404, { error: 'Chưa cấu hình passphrase local' });
@@ -160,7 +162,8 @@ http.createServer(async (req, res) => {
     // UC2 – Cung cấp khoá công khai (chỉ public key, không bao giờ lộ private key)
     if (url.pathname === '/api/public-key') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
-      return send(res, 200, fs.readFileSync(receiver.PUB, 'utf8'), 'text/plain');
+      const target = url.searchParams.get('target') === 'employee' ? receiver.EMP_PUB : receiver.PUB;
+      return send(res, 200, fs.readFileSync(target, 'utf8'), 'text/plain');
     }
 
     // UC10/11 – Nhận & lưu gói mã hoá
@@ -169,8 +172,10 @@ http.createServer(async (req, res) => {
       const p = await readBody(req);
       if (!p.encKey || !p.iv || !p.data) return send(res, 400, { error: 'Gói tin không hợp lệ' });
       const id = Date.now() + '-' + crypto.randomBytes(3).toString('hex');
+      const recipientRole = p.recipientRole === 'employee' ? 'employee' : 'boss';
       const pkg = { id, sender: p.sender || sess.name, title: p.title, category: p.category, filename: p.filename,
-        owner: sess.username, time: new Date().toISOString(), encKey: p.encKey, iv: p.iv, data: p.data };
+        owner: sess.username, recipientRole, targetUser: p.targetUser || null, replyTo: p.replyTo || null,
+        time: new Date().toISOString(), encKey: p.encKey, iv: p.iv, data: p.data };
       fs.writeFileSync(path.join(DATA_DIR, id + '.json'), JSON.stringify(pkg, null, 2));
       logActivity(sess.name, sess.role, 'upload', `${pkg.filename || 'Tài liệu'} · ${pkg.title || pkg.category || ''}`);
       return send(res, 200, { ok: true, id });
@@ -182,7 +187,18 @@ http.createServer(async (req, res) => {
       const list = fs.readdirSync(DATA_DIR).filter(f => /^\d+-[a-f0-9]+\.json$/.test(f)).map(f => {
         const { data, ...meta } = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f)));
         return { ...meta, size: data.length };
-      }).sort((a, b) => b.time.localeCompare(a.time));
+      }).filter(pkg => pkg.recipientRole !== 'employee').sort((a, b) => b.time.localeCompare(a.time));
+      return send(res, 200, list);
+    }
+
+    if (url.pathname === '/api/my-inbox') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'employee') return send(res, 403, { error: 'Chỉ nhân viên xem được hộp thư nhận' });
+      const list = fs.readdirSync(DATA_DIR).filter(f => /^\d+-[a-f0-9]+\.json$/.test(f)).map(f => {
+        const { data, ...meta } = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f)));
+        return { ...meta, size: data.length };
+      }).filter(pkg => pkg.recipientRole === 'employee' && (!pkg.targetUser || pkg.targetUser === sess.username))
+        .sort((a, b) => b.time.localeCompare(a.time));
       return send(res, 200, list);
     }
 
@@ -283,11 +299,12 @@ http.createServer(async (req, res) => {
     // UC12 – Giải mã (gọi sang receiver.js)
     if (url.pathname === '/api/decrypt' && req.method === 'POST') {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
-      if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền giải mã' });
       const b = await readBody(req);
       const pkg = b.pkg || JSON.parse(fs.readFileSync(path.join(DATA_DIR, path.basename(b.id) + '.json')));
+      const pkgRole = pkg.recipientRole === 'employee' ? 'employee' : 'boss';
+      if (sess.role !== pkgRole) return send(res, 403, { error: 'Không có quyền giải mã gói tin này' });
       try {
-        const plain = receiver.decryptPackage(pkg, b.passphrase);
+        const plain = receiver.decryptPackage(pkg, b.passphrase, pkgRole);
         logActivity(sess.name, sess.role, 'decrypt', `${pkg.filename || 'Tài liệu'} · ${pkg.title || ''}`);
         return send(res, 200, { filename: pkg.filename, data: plain.toString('base64') });
       } catch (e) { return send(res, 401, { error: 'Giải mã thất bại: sai passphrase/khoá hoặc dữ liệu bị sửa đổi' }); }

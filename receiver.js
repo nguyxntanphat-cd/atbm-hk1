@@ -1,4 +1,4 @@
-// ===== BÊN NHẬN (Boss) – Use Case 12, 13, 14 =====
+// ===== BÊN NHẬN (Boss & Nhân viên) – Use Case 12, 13, 14 =====
 // Chỉ file này được đọc PRIVATE KEY trong keystore/receiver/
 const fs = require('fs');
 const path = require('path');
@@ -8,14 +8,13 @@ const RECV_DIR = path.join(__dirname, 'keystore', 'receiver');   // KHO KEY BÊN
 const SEND_DIR = path.join(__dirname, 'keystore', 'sender');     // KHO KEY BÊN GỬI (công khai)
 const PRIV = path.join(RECV_DIR, 'boss_private.pem');
 const PUB = path.join(SEND_DIR, 'boss_public.pem');
+const EMP_PRIV = path.join(RECV_DIR, 'employee_private.pem');
+const EMP_PUB = path.join(SEND_DIR, 'employee_public.pem');
 
-// Use Case 1 – Tạo cặp khoá RSA; Use Case 2 – Cung cấp khoá công khai cho bên gửi
-function ensureKeys(passphrase) {
-  fs.mkdirSync(RECV_DIR, { recursive: true });
-  fs.mkdirSync(SEND_DIR, { recursive: true });
-  if (fs.existsSync(PRIV)) return;
+function generatePair(privPath, pubPath, passphrase, label) {
+  if (fs.existsSync(privPath) && fs.existsSync(pubPath)) return;
   if (typeof passphrase !== 'string' || !passphrase) {
-    throw new Error('Hãy đặt biến môi trường BOSS_PASS trước khi tạo private key lần đầu.');
+    throw new Error(`Thiếu passphrase để tạo private key cho ${label}.`);
   }
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
@@ -23,16 +22,25 @@ function ensureKeys(passphrase) {
     // private key được mã hoá AES-256-CBC bằng passphrase (PKCS#8)
     privateKeyEncoding: { type: 'pkcs8', format: 'pem', cipher: 'aes-256-cbc', passphrase },
   });
-  fs.writeFileSync(PRIV, privateKey, { mode: 0o600 }); // -> chỉ bên nhận giữ
-  fs.writeFileSync(PUB, publicKey);                     // -> cấp cho bên gửi
-  console.log('Đã sinh RSA-2048:\n  keystore/receiver/boss_private.pem (bí mật)\n  keystore/sender/boss_public.pem (công khai)');
+  fs.writeFileSync(privPath, privateKey, { mode: 0o600 });
+  fs.writeFileSync(pubPath, publicKey);
+  console.log(`Đã sinh RSA-2048 (${label}):\n  ${privPath}\n  ${pubPath}`);
+}
+
+// Use Case 1 – Tạo cặp khoá RSA; Use Case 2 – Cung cấp khoá công khai cho bên gửi
+function ensureKeys(bossPass, empPass = 'nv123') {
+  fs.mkdirSync(RECV_DIR, { recursive: true });
+  fs.mkdirSync(SEND_DIR, { recursive: true });
+  generatePair(PRIV, PUB, bossPass, 'Boss');
+  generatePair(EMP_PRIV, EMP_PUB, empPass, 'Nhân viên');
 }
 
 // Use Case 12 – Giải mã dữ liệu đã nhận
-function decryptPackage(pkg, passphrase) {
+function decryptPackage(pkg, passphrase, role = 'boss') {
+  const keyPath = role === 'employee' ? EMP_PRIV : PRIV;
   // UC13 – Giải mã khoá AES bằng RSA-OAEP (private key)
   const aesKey = crypto.privateDecrypt(
-    { key: fs.readFileSync(PRIV, 'utf8'), passphrase,
+    { key: fs.readFileSync(keyPath, 'utf8'), passphrase,
       padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
     Buffer.from(pkg.encKey, 'base64'));
   // UC14 – Giải mã nội dung bằng AES-256-GCM (16 byte cuối là tag xác thực)
@@ -42,5 +50,4 @@ function decryptPackage(pkg, passphrase) {
   return Buffer.concat([d.update(buf.subarray(0, buf.length - 16)), d.final()]);
 }
 
-module.exports = { ensureKeys, decryptPackage, PUB };
-
+module.exports = { ensureKeys, decryptPackage, PUB, EMP_PUB };

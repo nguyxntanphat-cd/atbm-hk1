@@ -3,68 +3,76 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Công cụ giải mã thủ công · Boss / Admin</title>
+  <title>Công cụ giải mã · Aether Vault</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="shell topbar-inner">
+  <div class="topbar-inner">
     <a class="brand" href="/admin">
-      <span>Truyền tải dữ liệu nội bộ</span>
-      <span class="brand-role">Boss / Admin (Bên nhận)</span>
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/></svg>
+      <span>Aether Vault</span>
+      <span class="brand-tag">Boss · Bên nhận</span>
     </a>
-    <nav class="nav-bar">
-      <a class="nav-link" href="/admin">Hộp thư đến</a>
-      <a class="nav-link active" href="/tool">Công cụ giải mã</a>
-      <a class="nav-link" href="/activity">Nhật ký hệ thống</a>
+    <nav class="nav-links" aria-label="Điều hướng quản trị">
+      <a href="/admin">Hộp thư đến</a>
+      <a class="active" href="/tool">Công cụ giải mã</a>
+      <a href="/activity">Nhật ký hệ thống</a>
+      <a href="/accounts">Quản lý tài khoản</a>
     </nav>
-    <div class="user-actions">
+    <div class="user-bar">
+      <span id="who">Boss</span>
       <a class="btn btn-sm" href="/logout">Đăng xuất</a>
     </div>
   </div>
 </header>
 
-<main class="shell">
-  <div class="page-header">
-    <h1>Công cụ giải mã gói tin thủ công (.enc.json)</h1>
-    <p>Tải lên tệp bản mã <code>.enc.json</code> lấy từ thư mục <code>storage/</code> hoặc nút "Bản mã (.json)" để kiểm tra cấu trúc bản mã và giải mã độc lập.</p>
+<main class="container">
+  <div class="page-head">
+    <div>
+      <h1>Công cụ giải mã gói tin thủ công (.enc.json)</h1>
+      <p>Tải lên tệp bản mã <code>.enc.json</code> lấy từ thư mục <code>storage/</code> hoặc nút "Bản mã (.json)" để kiểm tra cấu trúc bản mã và giải mã độc lập.</p>
+    </div>
   </div>
 
-  <div class="split-grid">
-    <section class="section-block">
-      <div class="section-head">
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head">
         <div>
           <h2>Chọn gói bản mã và nhập Passphrase</h2>
           <p>Sử dụng Private Key tại <code>keystore/receiver/boss_private.pem</code>.</p>
         </div>
       </div>
-
-      <div class="field">
-        <label for="f">Tệp gói mã hóa (.enc.json hoặc .json)</label>
-        <input class="file-input" id="f" type="file" accept=".json,.enc.json,application/json">
-      </div>
-
-      <div class="field">
-        <label for="pass">Passphrase mở Private Key</label>
-        <div style="display:flex;gap:8px">
-          <input class="input" type="password" id="pass" placeholder="Nhập passphrase đã cấu hình">
-          <button type="button" class="btn btn-sm" onclick="fillSavedPassphrase()">Điền passphrase đã lưu</button>
+      <div class="panel-body">
+        <div class="field">
+          <label for="f">Tệp gói mã hóa (.enc.json hoặc .json)</label>
+          <input class="file-input" id="f" type="file" accept=".json,.enc.json,application/json">
         </div>
+
+        <div class="field">
+          <label for="pass">Passphrase mở Private Key</label>
+          <div class="with-btn">
+            <input class="input" type="password" id="pass" placeholder="Nhập passphrase đã cấu hình">
+            <button type="button" class="btn" onclick="fillSavedPassphrase()">Điền passphrase đã lưu</button>
+          </div>
+        </div>
+
+        <div id="status" class="notice" role="status"></div>
+
+        <button id="go" class="btn btn-primary btn-block" onclick="decryptFile()">Giải mã & tải tệp gốc</button>
       </div>
-
-      <div id="status" class="notice" role="status"></div>
-
-      <button id="go" class="btn btn-primary" style="width:100%;margin-top:8px" onclick="decryptFile()">Giải mã & tải tệp gốc</button>
     </section>
 
-    <section class="section-block">
-      <div class="section-head">
+    <section class="panel">
+      <div class="panel-head">
         <div>
           <h2>Chi tiết gói mã hóa & kết quả giải mã</h2>
           <p>Hiển thị <code>encKey</code> (RSA-OAEP), <code>iv</code> (96-bit) và kết quả kiểm tra AES-GCM.</p>
         </div>
       </div>
-      <pre id="out" class="log-box">Chọn một tệp .enc.json để xem thông số bản mã tại đây.</pre>
+      <div class="panel-body">
+        <pre id="out" class="log-box">Chọn một tệp .enc.json để xem thông số bản mã tại đây.</pre>
+      </div>
     </section>
   </div>
 </main>
@@ -74,6 +82,9 @@ const f = document.querySelector('#f');
 const statusBox = document.querySelector('#status');
 const button = document.querySelector('#go');
 const out = document.querySelector('#out');
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(u => {
+  if (u) document.querySelector('#who').textContent = u.name;
+});
 
 function status(t, c) {
   statusBox.textContent = t;
