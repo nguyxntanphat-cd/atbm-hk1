@@ -1,8 +1,179 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090d18"><title>Tổng quan · Aether Vault</title><link rel="stylesheet" href="/style.css"></head><body>
-<header class="topbar shell"><a class="brand" href="/"><span class="brand-mark">✳</span><span>AETHER VAULT<small>secure document exchange</small></span></a><div class="top-actions"><span class="live"><i></i> Kết nối bảo mật</span><a class="link-btn" href="/logout">Đăng xuất ↗</a></div></header><nav class="shell app-nav"><a class="active" href="/">Tổng quan</a><a href="/send">Gửi tài liệu</a><a href="/history">Lịch sử của tôi</a></nav>
-<main class="shell"><section class="hero"><div class="eyebrow">Không gian nhân viên · Bảng điều khiển</div><h1 id="welcome">Chào mừng đến Aether Vault.</h1><p>Theo dõi tài liệu đã gửi, trạng thái hoạt động và cách hệ thống bảo vệ dữ liệu của bạn.</p></section>
-<section class="stats"><div class="card stat"><div class="stat-label">TÀI LIỆU ĐÃ GỬI</div><div id="doc-count" class="stat-value">—</div><div class="stat-foot">Từ tài khoản của bạn</div></div><div class="card stat"><div class="stat-label">HOẠT ĐỘNG TÀI KHOẢN</div><div id="event-count" class="stat-value">—</div><div class="stat-foot">Sự kiện đã ghi nhận</div></div><div class="card stat"><div class="stat-label">LẦN GỬI GẦN NHẤT</div><div id="last-sent" class="stat-value" style="font-size:16px">Chưa có</div><div class="stat-foot">Tài liệu mã hóa thành công</div></div></section>
-<section class="overview-grid"><div class="card card-pad"><div class="overview-heading"><div><div class="eyebrow">Hoạt động gần đây</div><h2 class="card-title" style="margin-top:8px">Tài liệu của bạn</h2></div><a class="btn" href="/history">Xem lịch sử →</a></div><div id="recent-docs" class="recent-list"><div class="empty">Đang tải dữ liệu…</div></div></div>
-<div class="card card-pad"><div class="eyebrow">Nhịp gửi tài liệu</div><h2 class="card-title" style="margin-top:8px">7 ngày gần nhất</h2><p class="card-sub">Số lượng tài liệu bạn đã gửi mỗi ngày.</p><div id="chart" class="mini-chart" aria-label="Biểu đồ tài liệu gửi trong 7 ngày"></div></div></section>
-<section class="card card-pad flow-card"><div class="eyebrow">Sơ đồ bảo mật</div><h2 class="card-title" style="margin-top:8px">Tệp được bảo vệ như thế nào?</h2><p class="card-sub">Dữ liệu được mã hóa ngay trên thiết bị trước khi máy chủ nhận gói tin.</p><div class="security-flow"><div class="flow-node"><span>01</span><b>Tệp gốc</b><small>Trên thiết bị của bạn</small></div><div class="flow-arrow">⟶</div><div class="flow-node accent"><span>02</span><b>AES-256-GCM</b><small>Mã hóa nội dung</small></div><div class="flow-arrow">⟶</div><div class="flow-node accent-blue"><span>03</span><b>RSA-OAEP</b><small>Bảo vệ khóa AES</small></div><div class="flow-arrow">⟶</div><div class="flow-node"><span>04</span><b>Gói tin</b><small>Lưu an toàn trên máy chủ</small></div></div><a class="btn btn-primary" href="/send" style="display:inline-block;margin-top:20px">＋　Gửi tài liệu mới</a></section></main><footer class="footer">AETHER VAULT · Truyền tải nội bộ an toàn</footer>
-<script>const $=s=>document.querySelector(s);function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function human(n){return n>1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.max(1,Math.round(n*3/4/1024))+' KB'}async function loadDashboard(){const [dr,ar,mr]=await Promise.all([fetch('/api/my-documents'),fetch('/api/my-activity'),fetch('/api/me')]);const docs=dr.ok?await dr.json():[],events=ar.ok?await ar.json():[],me=mr.ok?await mr.json():null;if(me)$('#welcome').textContent='Xin chào, '+me.name+'.';$('#doc-count').textContent=docs.length;$('#event-count').textContent=events.length;$('#last-sent').textContent=docs[0]?new Date(docs[0].time).toLocaleDateString('vi-VN'):'Chưa có';$('#recent-docs').innerHTML=docs.length?docs.slice(0,4).map(d=>`<div class="recent-row"><span class="recent-icon">◈</span><span class="recent-name"><b>${esc(d.title||d.filename)}</b><small>${esc(d.filename)} · ${new Date(d.time).toLocaleString('vi-VN')}</small></span><span class="pill">${human(d.size)}</span></div>`).join(''):'<div class="empty">Bạn chưa gửi tài liệu nào.<br><a href="/send">Gửi tài liệu đầu tiên →</a></div>';const days=Array.from({length:7},(_,i)=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(6-i));return d}),counts=days.map(d=>docs.filter(x=>{const t=new Date(x.time);return t.toDateString()===d.toDateString()}).length),max=Math.max(1,...counts);$('#chart').innerHTML=days.map((d,i)=>`<div class="chart-col"><span class="chart-count">${counts[i]}</span><div class="chart-track"><i style="height:${Math.max(5,counts[i]/max*100)}%"></i></div><small>${d.toLocaleDateString('vi-VN',{weekday:'short'})}</small></div>`).join('')}loadDashboard();setInterval(loadDashboard,20000)</script></body></html>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nhân viên · Gửi tài liệu mã hóa</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="shell topbar-inner">
+    <a class="brand" href="/">
+      <span>Truyền tải dữ liệu nội bộ</span>
+      <span class="brand-role">Nhân viên (Bên gửi)</span>
+    </a>
+    <nav class="nav-bar">
+      <a class="nav-link active" href="/">Gửi tài liệu</a>
+      <a class="nav-link" href="/history">Lịch sử đã gửi</a>
+    </nav>
+    <div class="user-actions">
+      <span id="who">Nhân viên</span>
+      <a class="btn btn-sm" href="/logout">Đăng xuất</a>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+  <div class="page-header">
+    <h1>Mã hóa và gửi tài liệu cho Boss</h1>
+    <p>Tệp được mã hóa bằng AES-256-GCM ngay trên trình duyệt, sau đó khóa AES được bọc bằng Public Key RSA-2048 của Boss trước khi gửi lên máy chủ.</p>
+  </div>
+
+  <div class="split-grid">
+    <section class="section-block">
+      <div class="section-head">
+        <div>
+          <h2>Thông tin tài liệu</h2>
+          <p>Mỗi lần gửi sinh một khóa AES-256 và IV 96-bit mới.</p>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="sender">Tên người gửi</label>
+          <input class="input" id="sender" placeholder="Tên nhân viên" maxlength="80">
+        </div>
+        <div class="field">
+          <label for="category">Loại tài liệu</label>
+          <select class="select" id="category">
+            <option>Báo cáo cấu trúc dự án</option>
+            <option>Tài liệu cần Boss ký</option>
+            <option>Hợp đồng & pháp lý</option>
+            <option>Tài chính</option>
+            <option>Khác</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="title">Tiêu đề</label>
+        <input class="input" id="title" placeholder="Ví dụ: Báo cáo cấu trúc dự án học kỳ 1" maxlength="120">
+      </div>
+
+      <div class="field">
+        <label for="file">Tệp đính kèm (tối đa 18 MB)</label>
+        <input class="file-input" type="file" id="file">
+      </div>
+
+      <div id="notice" class="notice" role="status"></div>
+
+      <button id="send-btn" class="btn btn-primary" style="width:100%;margin-top:8px" onclick="go()">Mã hóa RSA + AES & Gửi</button>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div>
+          <h2>Nhật ký quá trình mã hóa (Client-side)</h2>
+          <p>Hiển thị trực tiếp các bước thực thi trong <code>public/sender.js</code>.</p>
+        </div>
+      </div>
+      <pre id="log" class="log-box">Chưa có thao tác. Chọn tệp và bấm "Mã hóa RSA + AES & Gửi" để xem từng bước mã hóa.</pre>
+    </section>
+  </div>
+
+  <section class="section-block">
+    <div class="section-head">
+      <div>
+        <h2>Tài liệu đã gửi gần đây</h2>
+        <p>Danh sách các gói mã hóa đã gửi từ tài khoản của bạn.</p>
+      </div>
+      <a class="btn btn-sm" href="/history">Xem toàn bộ lịch sử</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Loại tài liệu</th>
+            <th>Tiêu đề</th>
+            <th>Tên tệp</th>
+            <th>Kích thước mã</th>
+            <th>Mã gói (ID)</th>
+          </tr>
+        </thead>
+        <tbody id="recent-docs"></tbody>
+      </table>
+      <div id="recent-empty" class="empty" style="display:none">Chưa gửi tài liệu nào.</div>
+    </div>
+  </section>
+</main>
+
+<script src="/sender.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+function esc(s = '') {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function human(n) {
+  return n > 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + ' MB' : Math.max(1, Math.round(n * 3 / 4 / 1024)) + ' KB';
+}
+function setNotice(text, type) {
+  const n = $('#notice');
+  n.textContent = text;
+  n.className = 'notice show ' + type;
+}
+async function loadRecent() {
+  const [dr, mr] = await Promise.all([fetch('/api/my-documents'), fetch('/api/me')]);
+  if (mr.ok) {
+    const me = await mr.json();
+    $('#who').textContent = me.name;
+    if (!$('#sender').value) $('#sender').value = me.name;
+  }
+  if (!dr.ok) return;
+  const docs = await dr.json();
+  $('#recent-empty').style.display = docs.length ? 'none' : 'block';
+  $('#recent-docs').innerHTML = docs.slice(0, 5).map(d => `
+    <tr>
+      <td>${new Date(d.time).toLocaleString('vi-VN')}</td>
+      <td><span class="badge">${esc(d.category || 'Khác')}</span></td>
+      <td>${esc(d.title || '—')}</td>
+      <td>${esc(d.filename || '')}</td>
+      <td>${human(d.size)}</td>
+      <td><code>${esc(d.id)}</code></td>
+    </tr>
+  `).join('');
+}
+async function go() {
+  const f = $('#file').files[0];
+  if (!f) return setNotice('Vui lòng chọn tệp cần gửi.', 'error');
+  if (f.size > 18 * 1024 * 1024) return setNotice('Tệp vượt quá giới hạn 18 MB.', 'error');
+  const btn = $('#send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Đang mã hóa & gửi…';
+  $('#notice').className = 'notice';
+  $('#log').textContent = '';
+  try {
+    const meta = {
+      sender: $('#sender').value.trim(),
+      title: $('#title').value.trim() || f.name,
+      category: $('#category').value
+    };
+    await encryptAndSend(f, meta, line => {
+      $('#log').textContent += line + '\n';
+    });
+    setNotice('Đã mã hóa và gửi gói tin thành công sang hộp thư Boss.', 'ok');
+    $('#file').value = '';
+    $('#title').value = '';
+    loadRecent();
+  } catch (e) {
+    setNotice('Lỗi gửi tài liệu: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Mã hóa RSA + AES & Gửi';
+  }
+}
+loadRecent();
+</script>
+</body>
+</html>

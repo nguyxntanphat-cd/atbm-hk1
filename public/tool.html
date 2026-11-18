@@ -1,6 +1,134 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090d18"><title>Công cụ giải mã · Aether Vault</title><link rel="stylesheet" href="/style.css"></head><body>
-<header class="topbar shell"><a class="brand" href="/admin"><span class="brand-mark">✳</span><span>AETHER VAULT<small>secure document exchange</small></span></a><div class="top-actions"><a class="link-btn" href="/admin">← Hộp thư</a><a class="link-btn" href="/logout">Đăng xuất</a></div></header>
-<main class="shell"><section class="hero"><div class="eyebrow">Tiện ích quản trị viên</div><h1>Mở gói tin mã hóa.</h1><p>Khôi phục tài liệu từ một gói <code>.enc.json</code> đã tải xuống. Tệp giải mã chỉ được tạo sau khi xác thực private key thành công.</p></section>
-<section class="tool-layout"><div class="card card-pad"><div class="eyebrow">Giải mã ngoại tuyến</div><h2 class="card-title" style="margin-top:9px">Chọn gói tin</h2><label id="drop" class="drop" for="f"><input id="f" type="file" accept=".json,.enc.json,application/json"><div><div class="drop-icon">⇧</div><strong>Kéo thả gói .enc.json vào đây</strong><span>hoặc bấm để chọn tệp đã tải về</span></div></label><div id="file-info" class="file-chip"></div><div class="field"><label for="pass">Passphrase mở private key</label><input class="input" type="password" id="pass" placeholder="Nhập passphrase bảo vệ private key"></div><div id="status" class="notice" role="status"></div><button id="go" class="btn btn-primary" style="width:100%;margin-top:18px;padding:13px" onclick="decryptFile()">◈　Giải mã & tải tài liệu</button><pre id="out" class="tool-result" style="margin-top:16px"></pre></div>
-<div class="card card-pad" style="margin-top:16px"><div class="security-item"><span class="sec-icon">◇</span><div><b>Kiểm tra xác thực AES-GCM</b><small>Nội dung bị sửa đổi sẽ không giải mã thành công.</small></div></div></div></section></main><footer class="footer">AETHER VAULT · Private key không rời máy chủ</footer>
-<script>const f=document.querySelector('#f'),drop=document.querySelector('#drop'),statusBox=document.querySelector('#status'),button=document.querySelector('#go'),out=document.querySelector('#out');function status(t,c){statusBox.textContent=t;statusBox.className='notice show '+c}f.onchange=()=>{const x=f.files[0];if(x){const i=document.querySelector('#file-info');i.textContent='◈  '+x.name+' · '+(x.size/1024).toFixed(1)+' KB';i.classList.add('show')}};for(const ev of ['dragover','dragenter'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')});for(const ev of ['dragleave','drop'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length){f.files=e.dataTransfer.files;f.dispatchEvent(new Event('change'))}});async function decryptFile(){if(!f.files[0])return status('Hãy chọn gói mã hóa trước.','error');button.disabled=true;button.textContent='Đang xác thực & giải mã…';out.classList.remove('show');try{const pkg=JSON.parse(await f.files[0].text());if(!pkg.encKey||!pkg.iv||!pkg.data)throw Error('Tệp này không phải gói mã hóa hợp lệ.');const r=await fetch('/api/decrypt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pkg,passphrase:document.querySelector('#pass').value})});const j=await r.json();if(!r.ok)throw Error(j.error||'Giải mã thất bại');const data=Uint8Array.from(atob(j.data),c=>c.charCodeAt(0));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=j.filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);status('Giải mã thành công. Tài liệu đã được tải xuống.','ok');out.textContent='Tên tệp: '+j.filename+'\nKích thước: '+data.length.toLocaleString('vi-VN')+' byte\nXác thực AES-GCM: thành công';out.classList.add('show')}catch(e){status(e.message,'error')}finally{button.disabled=false;button.innerHTML='◈　Giải mã & tải tài liệu'}}</script></body></html>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Công cụ giải mã thủ công · Boss / Admin</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="shell topbar-inner">
+    <a class="brand" href="/admin">
+      <span>Truyền tải dữ liệu nội bộ</span>
+      <span class="brand-role">Boss / Admin (Bên nhận)</span>
+    </a>
+    <nav class="nav-bar">
+      <a class="nav-link" href="/admin">Hộp thư đến</a>
+      <a class="nav-link active" href="/tool">Công cụ giải mã</a>
+      <a class="nav-link" href="/activity">Nhật ký hệ thống</a>
+    </nav>
+    <div class="user-actions">
+      <a class="btn btn-sm" href="/logout">Đăng xuất</a>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+  <div class="page-header">
+    <h1>Công cụ giải mã gói tin thủ công (.enc.json)</h1>
+    <p>Tải lên tệp bản mã <code>.enc.json</code> lấy từ thư mục <code>storage/</code> hoặc nút "Bản mã (.json)" để kiểm tra cấu trúc bản mã và giải mã độc lập.</p>
+  </div>
+
+  <div class="split-grid">
+    <section class="section-block">
+      <div class="section-head">
+        <div>
+          <h2>Chọn gói bản mã và nhập Passphrase</h2>
+          <p>Sử dụng Private Key tại <code>keystore/receiver/boss_private.pem</code>.</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="f">Tệp gói mã hóa (.enc.json hoặc .json)</label>
+        <input class="file-input" id="f" type="file" accept=".json,.enc.json,application/json">
+      </div>
+
+      <div class="field">
+        <label for="pass">Passphrase mở Private Key</label>
+        <div style="display:flex;gap:8px">
+          <input class="input" type="password" id="pass" placeholder="Nhập passphrase (mặc định: boss123)">
+          <button type="button" class="btn btn-sm" onclick="document.querySelector('#pass').value='boss123'">Điền boss123</button>
+        </div>
+      </div>
+
+      <div id="status" class="notice" role="status"></div>
+
+      <button id="go" class="btn btn-primary" style="width:100%;margin-top:8px" onclick="decryptFile()">Giải mã & tải tệp gốc</button>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div>
+          <h2>Chi tiết gói mã hóa & kết quả giải mã</h2>
+          <p>Hiển thị <code>encKey</code> (RSA-OAEP), <code>iv</code> (96-bit) và kết quả kiểm tra AES-GCM.</p>
+        </div>
+      </div>
+      <pre id="out" class="log-box">Chọn một tệp .enc.json để xem thông số bản mã tại đây.</pre>
+    </section>
+  </div>
+</main>
+
+<script>
+const f = document.querySelector('#f');
+const statusBox = document.querySelector('#status');
+const button = document.querySelector('#go');
+const out = document.querySelector('#out');
+
+function status(t, c) {
+  statusBox.textContent = t;
+  statusBox.className = 'notice show ' + c;
+}
+
+f.onchange = async () => {
+  const x = f.files[0];
+  if (!x) return;
+  try {
+    const pkg = JSON.parse(await x.text());
+    out.textContent =
+      'Tệp gói mã: ' + x.name + '\n' +
+      'Người gửi:  ' + (pkg.sender || '—') + '\n' +
+      'Tên tệp:    ' + (pkg.filename || '—') + '\n' +
+      'IV (96-bit): ' + (pkg.iv || '') + '\n' +
+      'encKey (RSA-OAEP, 256 bytes base64):\n' + (pkg.encKey || '').slice(0, 120) + '...\n' +
+      'data (AES-256-GCM + 16B AuthTag):\n' + (pkg.data || '').slice(0, 120) + '...';
+  } catch {
+    out.textContent = 'Không đọc được cấu trúc JSON của tệp này.';
+  }
+};
+
+async function decryptFile() {
+  if (!f.files[0]) return status('Vui lòng chọn tệp .enc.json trước.', 'error');
+  button.disabled = true;
+  button.textContent = 'Đang giải mã…';
+  try {
+    const pkg = JSON.parse(await f.files[0].text());
+    if (!pkg.encKey || !pkg.iv || !pkg.data) throw Error('Tệp không chứa đủ encKey, iv, data.');
+    const r = await fetch('/api/decrypt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pkg, passphrase: document.querySelector('#pass').value })
+    });
+    const j = await r.json();
+    if (!r.ok) throw Error(j.error || 'Giải mã thất bại');
+    const data = Uint8Array.from(atob(j.data), c => c.charCodeAt(0));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data]));
+    a.download = j.filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    status('Giải mã thành công. Đã tải tệp gốc về máy.', 'ok');
+    const previewText = /\.(txt|md|csv|json|html?|js|css|xml|log)$/i.test(j.filename)
+      ? '\n\n--- Nội dung tệp sau giải mã ---\n' + new TextDecoder().decode(data)
+      : '';
+    out.textContent += '\n\n[KẾT QUẢ GIẢI MÃ]\nTên tệp gốc: ' + j.filename + '\nKích thước: ' + data.length + ' bytes\nToàn vẹn AES-256-GCM: Hợp lệ' + previewText;
+  } catch (e) {
+    status(e.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Giải mã & tải tệp gốc';
+  }
+}
+</script>
+</body>
+</html>

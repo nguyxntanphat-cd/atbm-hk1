@@ -1,4 +1,71 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090d18"><title>Đăng nhập · Aether Vault</title><link rel="stylesheet" href="/style.css"></head><body>
-<main class="login-wrap"><section class="login-art"><div class="orb"></div><div class="brand"><span class="brand-mark">✳</span><span>AETHER VAULT<small>secure document exchange</small></span></div><div class="eyebrow" style="margin-top:68px">Không gian truyền tải an toàn</div><h1>Riêng tư trong từng <span>gói tin.</span></h1><p>Tài liệu được mã hóa ngay trên thiết bị bằng AES-256-GCM. Khóa phiên được bảo vệ bằng RSA-OAEP trước khi rời khỏi trình duyệt.</p><div class="security-list" style="max-width:390px"><div class="security-item"><span class="sec-icon">⌘</span><div><b>Mã hóa lai hiện đại</b><small>Mỗi lần gửi tạo một khóa AES ngẫu nhiên riêng.</small></div></div><div class="security-item"><span class="sec-icon">◈</span><div><b>Private key được bảo vệ</b><small>Chỉ người nhận có thể mở khóa và đọc tài liệu.</small></div></div></div></section>
-<section class="login-side"><form class="card login-card" onsubmit="login(event)"><div class="eyebrow">Chào mừng trở lại</div><h2>Đăng nhập hệ thống</h2><p>Nhập tài khoản để vào không gian làm việc của bạn.</p><div class="field"><label for="username">Tên đăng nhập</label><input class="input" id="username" placeholder="Ví dụ: nhanvien" autocomplete="username" required autofocus></div><div class="field"><label for="password">Mật khẩu</label><input class="input" id="password" type="password" placeholder="Nhập mật khẩu" autocomplete="current-password" required></div><div id="err" class="error-text" role="alert"></div><button id="submit" class="btn btn-primary" type="submit">Vào không gian an toàn <span>→</span></button><div class="login-accounts"><b style="color:#d9e3f6">Tài khoản demo</b><br>Nhân viên: <code>nhanvien</code> / <code>123456</code><br>Quản trị viên: <code>boss</code> / <code>admin123</code></div></form></section></main>
-<script>async function login(e){e.preventDefault();const b=document.querySelector('#submit'),err=document.querySelector('#err');b.disabled=true;b.textContent='Đang xác thực…';err.textContent='';try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.querySelector('#username').value.trim(),password:document.querySelector('#password').value})});const j=await r.json();if(!r.ok)throw Error(j.error||'Đăng nhập thất bại');location.href=j.redirect}catch(x){err.textContent=x.message;b.disabled=false;b.textContent='Vào không gian an toàn →'}}</script></body></html>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Đăng nhập · Truyền tải dữ liệu nội bộ (RSA + AES)</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main class="login-page">
+  <section class="login-box">
+    <h1>Đăng nhập hệ thống</h1>
+    <p>Ứng dụng mã hóa RSA-OAEP và AES-256-GCM trong truyền tải dữ liệu nội bộ.</p>
+
+    <form onsubmit="login(event)">
+      <div class="field">
+        <label for="username">Tên đăng nhập</label>
+        <input class="input" id="username" placeholder="nhanvien hoặc boss" autocomplete="username" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Mật khẩu</label>
+        <input class="input" id="password" type="password" placeholder="Nhập mật khẩu" autocomplete="current-password" required>
+      </div>
+      <div id="err" class="notice error" role="alert"></div>
+      <button id="submit" class="btn btn-primary" type="submit" style="width:100%;margin-top:8px">Đăng nhập</button>
+    </form>
+
+    <div class="demo-accounts">
+      <div><strong>Chọn nhanh tài khoản demo (1 click):</strong></div>
+      <div class="demo-accounts-grid">
+        <button type="button" class="btn btn-sm" onclick="quickLogin('nhanvien','123456')">Nhân viên (nhanvien)</button>
+        <button type="button" class="btn btn-sm" onclick="quickLogin('boss','admin123')">Boss / Admin (boss)</button>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+function quickLogin(u, p) {
+  document.querySelector('#username').value = u;
+  document.querySelector('#password').value = p;
+  document.querySelector('form').requestSubmit();
+}
+async function login(e) {
+  e.preventDefault();
+  const b = document.querySelector('#submit');
+  const err = document.querySelector('#err');
+  b.disabled = true;
+  b.textContent = 'Đang kiểm tra…';
+  err.className = 'notice error';
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.querySelector('#username').value.trim(),
+        password: document.querySelector('#password').value
+      })
+    });
+    const j = await r.json();
+    if (!r.ok) throw Error(j.error || 'Đăng nhập thất bại');
+    location.href = j.redirect;
+  } catch (x) {
+    err.textContent = x.message;
+    err.className = 'notice error show';
+    b.disabled = false;
+    b.textContent = 'Đăng nhập';
+  }
+}
+</script>
+</body>
+</html>

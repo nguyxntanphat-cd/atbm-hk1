@@ -1,21 +1,130 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090d18"><title>Gửi tài liệu · Aether Vault</title><link rel="stylesheet" href="/style.css"></head><body>
-<header class="topbar shell"><a class="brand" href="/"><span class="brand-mark">✳</span><span>AETHER VAULT<small>secure document exchange</small></span></a><div class="top-actions"><span class="live"><i></i> Kết nối bảo mật</span><a class="link-btn" href="/logout">Đăng xuất ↗</a></div></header>
-<nav class="shell app-nav"><a href="/">Tổng quan</a><a class="active" href="/send">Gửi tài liệu</a><a href="/history">Lịch sử của tôi</a></nav>
-<main class="shell"><section class="hero"><div class="eyebrow">Không gian nhân viên · Mã hóa đầu cuối</div><h1>Gửi tài liệu an toàn.</h1><p>Chọn tài liệu, thêm thông tin cần thiết. Nội dung được mã hóa trong trình duyệt trước khi gửi đến hộp thư quản trị.</p></section>
-<section id="send" class="layout"><div class="card card-pad"><h2 class="card-title">Tạo gói tin bảo mật</h2><p class="card-sub">Mỗi tài liệu sử dụng khóa AES-256-GCM ngẫu nhiên riêng.</p>
-<div class="field"><label for="sender">Người gửi</label><input class="input" id="sender" placeholder="Tên của bạn" maxlength="80"></div><div class="field"><label for="title">Tiêu đề tài liệu</label><input class="input" id="title" placeholder="Ví dụ: Báo cáo quý III" maxlength="120"></div><div class="field"><label for="category">Danh mục</label><select class="select" id="category"><option>Báo cáo dự án</option><option>Tài liệu cần phê duyệt</option><option>Hợp đồng & pháp lý</option><option>Tài chính</option><option>Nhân sự</option><option>Khác</option></select></div>
-<label id="drop" class="drop" for="file"><input type="file" id="file"><div><div class="drop-icon">⇧</div><strong>Kéo thả tài liệu vào đây</strong><span>hoặc bấm để chọn · tối đa 18 MB</span></div></label><div id="file-chip" class="file-chip"><span id="file-name"></span><button type="button" class="icon-btn" onclick="clearFile()">Gỡ bỏ ×</button></div>
-<div class="progress" id="progress"><div class="step" data-step="1">01 · Khóa công khai</div><div class="step" data-step="2">02 · Mã hóa AES</div><div class="step" data-step="3">03 · Bọc khóa RSA</div><div class="step" data-step="4">04 · Chuyển gói tin</div></div><div id="notice" class="notice" role="status"></div>
-<button id="send" class="btn btn-primary" style="width:100%;margin-top:20px;padding:13px" onclick="go()">✧　Mã hóa & gửi an toàn</button></div>
-<aside><div class="card card-pad"><div class="eyebrow">Lớp bảo vệ</div><h2 class="card-title" style="margin-top:9px">Bảo mật theo từng lớp</h2><div class="security-list"><div class="security-item"><span class="sec-icon">◉</span><div><b>Mã hóa ngay trên trình duyệt</b><small>Tệp gốc không được tải lên máy chủ ở dạng rõ.</small></div></div><div class="security-item"><span class="sec-icon">⌑</span><div><b>AES-256-GCM</b><small>Mã hóa nội dung và xác thực tính toàn vẹn.</small></div></div><div class="security-item"><span class="sec-icon">◇</span><div><b>RSA-OAEP · SHA-256</b><small>Khóa AES chỉ người giữ private key mới mở được.</small></div></div></div></div><div class="card card-pad" style="margin-top:16px"><div class="eyebrow">Luồng xử lý</div><div class="crypto-flow"><div class="flow-line"><span>Tệp của bạn</span><strong>→ AES-GCM</strong></div><div class="flow-line"><span>Khóa AES</span><strong>→ RSA-OAEP</strong></div><div class="flow-line"><span>Gói mã hóa</span><strong>→ Hộp thư</strong></div></div></div></aside></section></main><footer class="footer">AETHER VAULT · Truyền tải nội bộ an toàn</footer>
-<script src="/sender.js"></script><script>
-const fileInput=document.querySelector('#file'),drop=document.querySelector('#drop'),notice=document.querySelector('#notice'),sendButton=document.querySelector('#send');
-fetch('/api/me').then(r=>r.ok?r.json():null).then(u=>{if(u)document.querySelector('#sender').value=u.name});
-function setNotice(text,type){notice.textContent=text;notice.className='notice show '+type}
-function clearFile(){fileInput.value='';document.querySelector('#file-chip').classList.remove('show')}
-function prettySize(n){return n<1024*1024?(n/1024).toFixed(0)+' KB':(n/1024/1024).toFixed(2)+' MB'}
-fileInput.onchange=()=>{const f=fileInput.files[0];if(!f)return;document.querySelector('#file-name').textContent='◈  '+f.name+' · '+prettySize(f.size);document.querySelector('#file-chip').classList.add('show');notice.className='notice'};
-for(const ev of ['dragenter','dragover'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')});for(const ev of ['dragleave','drop'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length){fileInput.files=e.dataTransfer.files;fileInput.dispatchEvent(new Event('change'))}});
-function markStep(n){document.querySelectorAll('.step').forEach(el=>{const x=+el.dataset.step;el.classList.toggle('active',x===n);el.classList.toggle('done',x<n)})}
-async function go(){const f=fileInput.files[0];if(!f)return setNotice('Hãy chọn một tài liệu trước khi gửi.','error');if(f.size>18*1024*1024)return setNotice('Tài liệu vượt quá giới hạn 18 MB.','error');sendButton.disabled=true;sendButton.textContent='Đang mã hóa…';notice.className='notice';document.querySelectorAll('.step').forEach(x=>x.classList.remove('active','done'));try{const meta={sender:document.querySelector('#sender').value.trim(),title:document.querySelector('#title').value.trim()||f.name,category:document.querySelector('#category').value};await encryptAndSend(f,meta,(line)=>{const m=line.match(/^([1-5])\./);if(m)markStep(Math.min(+m[1],4))});markStep(5);setNotice('Đã mã hóa và gửi tài liệu thành công. Gói tin đã nằm trong hộp thư quản trị.','ok');clearFile();document.querySelector('#title').value=''}catch(e){setNotice('Không thể gửi tài liệu: '+e.message,'error')}finally{sendButton.disabled=false;sendButton.innerHTML='✧　Mã hóa & gửi an toàn'}}
-</script></body></html>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nhân viên · Gửi tài liệu mã hóa</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="shell topbar-inner">
+    <a class="brand" href="/">
+      <span>Truyền tải dữ liệu nội bộ</span>
+      <span class="brand-role">Nhân viên (Bên gửi)</span>
+    </a>
+    <nav class="nav-bar">
+      <a class="nav-link active" href="/send">Gửi tài liệu</a>
+      <a class="nav-link" href="/history">Lịch sử đã gửi</a>
+    </nav>
+    <div class="user-actions">
+      <span id="who">Nhân viên</span>
+      <a class="btn btn-sm" href="/logout">Đăng xuất</a>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+  <div class="page-header">
+    <h1>Mã hóa và gửi tài liệu cho Boss</h1>
+    <p>Tệp được mã hóa bằng AES-256-GCM ngay trên trình duyệt, sau đó khóa AES được bọc bằng Public Key RSA-2048 của Boss trước khi gửi lên máy chủ.</p>
+  </div>
+
+  <div class="split-grid">
+    <section class="section-block">
+      <div class="section-head">
+        <div>
+          <h2>Thông tin tài liệu</h2>
+          <p>Mỗi lần gửi sinh một khóa AES-256 và IV 96-bit mới.</p>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="sender">Tên người gửi</label>
+          <input class="input" id="sender" placeholder="Tên nhân viên" maxlength="80">
+        </div>
+        <div class="field">
+          <label for="category">Loại tài liệu</label>
+          <select class="select" id="category">
+            <option>Báo cáo cấu trúc dự án</option>
+            <option>Tài liệu cần Boss ký</option>
+            <option>Hợp đồng & pháp lý</option>
+            <option>Tài chính</option>
+            <option>Khác</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="title">Tiêu đề</label>
+        <input class="input" id="title" placeholder="Ví dụ: Báo cáo cấu trúc dự án học kỳ 1" maxlength="120">
+      </div>
+
+      <div class="field">
+        <label for="file">Tệp đính kèm (tối đa 18 MB)</label>
+        <input class="file-input" type="file" id="file">
+      </div>
+
+      <div id="notice" class="notice" role="status"></div>
+
+      <button id="send-btn" class="btn btn-primary" style="width:100%;margin-top:8px" onclick="go()">Mã hóa RSA + AES & Gửi</button>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div>
+          <h2>Nhật ký quá trình mã hóa (Client-side)</h2>
+          <p>Hiển thị trực tiếp các bước thực thi trong <code>public/sender.js</code>.</p>
+        </div>
+      </div>
+      <pre id="log" class="log-box">Chưa có thao tác. Chọn tệp và bấm "Mã hóa RSA + AES & Gửi" để xem từng bước mã hóa.</pre>
+    </section>
+  </div>
+</main>
+
+<script src="/sender.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(u => {
+  if (u) {
+    $('#who').textContent = u.name;
+    if (!$('#sender').value) $('#sender').value = u.name;
+  }
+});
+function setNotice(text, type) {
+  const n = $('#notice');
+  n.textContent = text;
+  n.className = 'notice show ' + type;
+}
+async function go() {
+  const f = $('#file').files[0];
+  if (!f) return setNotice('Vui lòng chọn tệp cần gửi.', 'error');
+  if (f.size > 18 * 1024 * 1024) return setNotice('Tệp vượt quá giới hạn 18 MB.', 'error');
+  const btn = $('#send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Đang mã hóa & gửi…';
+  $('#notice').className = 'notice';
+  $('#log').textContent = '';
+  try {
+    const meta = {
+      sender: $('#sender').value.trim(),
+      title: $('#title').value.trim() || f.name,
+      category: $('#category').value
+    };
+    await encryptAndSend(f, meta, line => {
+      $('#log').textContent += line + '\n';
+    });
+    setNotice('Đã mã hóa và gửi gói tin thành công sang hộp thư Boss.', 'ok');
+    $('#file').value = '';
+    $('#title').value = '';
+  } catch (e) {
+    setNotice('Lỗi gửi tài liệu: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Mã hóa RSA + AES & Gửi';
+  }
+}
+</script>
+</body>
+</html>
