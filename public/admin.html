@@ -17,6 +17,7 @@
       <a class="nav-link active" href="/admin">Hộp thư đến</a>
       <a class="nav-link" href="/tool">Công cụ giải mã</a>
       <a class="nav-link" href="/activity">Nhật ký hệ thống</a>
+      <a class="nav-link" href="/accounts">Quản lý tài khoản</a>
     </nav>
     <div class="user-actions">
       <a class="btn btn-sm" href="/logout">Đăng xuất</a>
@@ -41,8 +42,7 @@
 
     <div class="key-bar">
       <label for="pass">Passphrase mở Private Key:</label>
-      <input class="input" type="password" id="pass" placeholder="Mặc định: boss123">
-      <button type="button" class="btn btn-sm" onclick="fillPass()">Điền mặc định (boss123)</button>
+      <input class="input" type="password" id="pass" placeholder="Nhập passphrase đã cấu hình">
       <label class="checkbox-label">
         <input id="auto" type="checkbox">
         <span>Tự động giải mã khi có tài liệu mới</span>
@@ -104,11 +104,6 @@ $('#search').oninput = render;
 $('#category').onchange = render;
 $('#sort').onchange = render;
 
-function fillPass() {
-  $('#pass').value = 'boss123';
-  sessionStorage.aetherPass = 'boss123';
-  if ($('#auto').checked) load();
-}
 function esc(s = '') {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

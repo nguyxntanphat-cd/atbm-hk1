@@ -7,18 +7,15 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const receiver = require('./receiver');
+const accountStore = require('./account-store');
 
 const PORT = 3000;
 const DATA_DIR = path.join(__dirname, 'storage');      // chỉ chứa bản MÃ HOÁ
 const AUDIT_FILE = path.join(DATA_DIR, 'activity.json');
-const PASSPHRASE = process.env.BOSS_PASS || 'boss123';  // passphrase bảo vệ private key
+const PASSPHRASE = process.env.BOSS_PASS;  // passphrase bảo vệ private key
 fs.mkdirSync(DATA_DIR, { recursive: true });
 receiver.ensureKeys(PASSPHRASE);
-
-const USERS = {
-  nhanvien: { pass: '123456', role: 'employee', name: 'Nhân viên A' },
-  boss: { pass: 'admin123', role: 'boss', name: 'Boss' }
-};
+accountStore.ensure(DATA_DIR);
 const sessions = new Map();
 
 function readAudit() {
@@ -28,12 +25,19 @@ function readAudit() {
 function logActivity(actor, role, action, detail = '') {
   const events = readAudit();
   events.push({ id: crypto.randomBytes(8).toString('hex'), time: new Date().toISOString(), actor, role, action, detail });
-  fs.writeFileSync(AUDIT_FILE, JSON.stringify(events.slice(-5000)));
+  fs.writeFileSync(AUDIT_FILE, JSON.stringify(events.slice(-5000), null, 2));
 }
 
 function getSession(req) {
   const m = (req.headers.cookie || '').match(/(?:^|;\s*)sid=([^;]+)/);
-  return m ? sessions.get(m[1]) || null : null;
+  if (!m) return null;
+  const session = sessions.get(m[1]);
+  if (!session) return null;
+  const account = accountStore.find(DATA_DIR, session.username);
+  if (!account || !account.active) { sessions.delete(m[1]); return null; }
+  session.name = account.name;
+  session.role = account.role;
+  return session;
 }
 
 const send = (res, code, body, type = 'application/json') => {
@@ -50,7 +54,7 @@ const readBody = req => new Promise((ok, fail) => {
   let s = ''; req.on('data', c => { s += c; if (s.length > 30e6) req.destroy(); });
   req.on('end', () => { try { ok(JSON.parse(s || '{}')); } catch (e) { fail(e); } });
 });
-const pages = { '/': 'employee.html', '/send': 'send.html', '/admin': 'admin.html', '/tool': 'tool.html', '/history': 'history.html', '/activity': 'activity.html' };
+const pages = { '/': 'employee.html', '/send': 'send.html', '/admin': 'admin.html', '/tool': 'tool.html', '/history': 'history.html', '/activity': 'activity.html', '/accounts': 'accounts.html' };
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -62,13 +66,14 @@ http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { username, password } = await readBody(req);
-      const u = USERS[username];
-      if (!u || u.pass !== password) {
-        logActivity(username || 'Không rõ', u?.role || 'unknown', 'login_failed', 'Đăng nhập thất bại');
+      const u = accountStore.authenticate(DATA_DIR, username, password);
+      if (!u) {
+        const attempted = accountStore.find(DATA_DIR, username);
+        logActivity(username || 'Không rõ', attempted?.role || 'unknown', 'login_failed', 'Đăng nhập thất bại');
         return send(res, 401, { error: 'Sai tên đăng nhập hoặc mật khẩu' });
       }
       const sid = crypto.randomBytes(24).toString('hex');
-      sessions.set(sid, { username, role: u.role, name: u.name });
+      sessions.set(sid, { username: u.username, role: u.role, name: u.name });
       logActivity(u.name, u.role, 'login', 'Đăng nhập thành công');
       res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': `sid=${sid}; Path=/; HttpOnly` });
       return res.end(JSON.stringify({ ok: true, role: u.role, name: u.name, redirect: u.role === 'boss' ? '/admin' : '/' }));
@@ -91,7 +96,7 @@ http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && pages[url.pathname]) {
       if (!sess) return redirect(res, '/login');
-      if ((url.pathname === '/admin' || url.pathname === '/tool' || url.pathname === '/activity') && sess.role !== 'boss') return redirect(res, '/login');
+      if ((url.pathname === '/admin' || url.pathname === '/tool' || url.pathname === '/activity' || url.pathname === '/accounts') && sess.role !== 'boss') return redirect(res, '/login');
       if ((url.pathname === '/history' || url.pathname === '/send') && sess.role !== 'employee') return redirect(res, '/admin');
       if (url.pathname === '/' && sess.role !== 'employee') return redirect(res, '/admin');
       return send(res, 200, fs.readFileSync(path.join(__dirname, 'public', pages[url.pathname])), 'text/html; charset=utf-8');
@@ -115,7 +120,7 @@ http.createServer(async (req, res) => {
       const id = Date.now() + '-' + crypto.randomBytes(3).toString('hex');
       const pkg = { id, sender: p.sender || sess.name, title: p.title, category: p.category, filename: p.filename,
         owner: sess.username, time: new Date().toISOString(), encKey: p.encKey, iv: p.iv, data: p.data };
-      fs.writeFileSync(path.join(DATA_DIR, id + '.json'), JSON.stringify(pkg));
+      fs.writeFileSync(path.join(DATA_DIR, id + '.json'), JSON.stringify(pkg, null, 2));
       logActivity(sess.name, sess.role, 'upload', `${pkg.filename || 'Tài liệu'} · ${pkg.title || pkg.category || ''}`);
       return send(res, 200, { ok: true, id });
     }
@@ -149,6 +154,57 @@ http.createServer(async (req, res) => {
       if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
       if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền xem nhật ký hệ thống' });
       return send(res, 200, readAudit().slice().reverse());
+    }
+
+    if (url.pathname === '/api/accounts') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền quản lý tài khoản' });
+      const role = url.searchParams.get('role');
+      if (!['employee', 'boss'].includes(role)) return send(res, 400, { error: 'Loại tài khoản không hợp lệ' });
+      return send(res, 200, accountStore.list(DATA_DIR, role));
+    }
+
+    if (url.pathname === '/api/accounts/update' && req.method === 'POST') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền quản lý tài khoản' });
+      const b = await readBody(req);
+      try {
+        const updated = accountStore.update(DATA_DIR, b.username, b);
+        if (!updated) return send(res, 404, { error: 'Không tìm thấy tài khoản' });
+        logActivity(sess.name, sess.role, 'account_update', `${updated.role} · ${updated.username}`);
+        return send(res, 200, updated);
+      } catch (e) { return send(res, 400, { error: e.message }); }
+    }
+
+    if (url.pathname === '/api/accounts/status' && req.method === 'POST') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền quản lý tài khoản' });
+      const b = await readBody(req);
+      if (typeof b.active !== 'boolean') return send(res, 400, { error: 'Trạng thái tài khoản không hợp lệ' });
+      if (String(b.username).toLocaleLowerCase('vi') === sess.username.toLocaleLowerCase('vi') && b.active === false) {
+        return send(res, 400, { error: 'Bạn không thể khóa tài khoản admin đang đăng nhập' });
+      }
+      try {
+        const updated = accountStore.setActive(DATA_DIR, b.username, b.active === true);
+        if (!updated) return send(res, 404, { error: 'Không tìm thấy tài khoản' });
+        logActivity(sess.name, sess.role, 'account_status', `${updated.username} · ${updated.active ? 'mở khóa' : 'khóa'}`);
+        return send(res, 200, updated);
+      } catch (e) { return send(res, 400, { error: e.message }); }
+    }
+
+    if (url.pathname === '/api/accounts/delete' && req.method === 'POST') {
+      if (!sess) return send(res, 401, { error: 'Chưa đăng nhập' });
+      if (sess.role !== 'boss') return send(res, 403, { error: 'Không có quyền quản lý tài khoản' });
+      const b = await readBody(req);
+      if (String(b.username).toLocaleLowerCase('vi') === sess.username.toLocaleLowerCase('vi')) {
+        return send(res, 400, { error: 'Bạn không thể xóa tài khoản admin đang đăng nhập' });
+      }
+      try {
+        const removed = accountStore.remove(DATA_DIR, b.username);
+        if (!removed) return send(res, 404, { error: 'Không tìm thấy tài khoản' });
+        logActivity(sess.name, sess.role, 'account_delete', `${removed.role} · ${removed.username}`);
+        return send(res, 200, { ok: true });
+      } catch (e) { return send(res, 400, { error: e.message }); }
     }
 
     if (url.pathname === '/api/raw') { // tải bản mã gốc

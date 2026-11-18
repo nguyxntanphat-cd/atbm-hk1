@@ -17,6 +17,7 @@
       <a class="nav-link" href="/admin">Hộp thư đến</a>
       <a class="nav-link" href="/tool">Công cụ giải mã</a>
       <a class="nav-link active" href="/activity">Nhật ký hệ thống</a>
+      <a class="nav-link" href="/accounts">Quản lý tài khoản</a>
     </nav>
     <div class="user-actions">
       <a class="btn btn-sm" href="/logout">Đăng xuất</a>
@@ -52,6 +53,10 @@
         <option value="upload">Gửi tài liệu</option>
         <option value="decrypt">Giải mã</option>
         <option value="delete">Xóa tài liệu</option>
+        <option value="account_create">Tạo tài khoản</option>
+        <option value="account_update">Cập nhật hồ sơ tài khoản</option>
+        <option value="account_status">Thay đổi trạng thái tài khoản</option>
+        <option value="account_delete">Xóa tài khoản</option>
       </select>
       <select id="role" class="select">
         <option value="">Tất cả vai trò</option>
@@ -89,7 +94,11 @@ const labels = {
   login_failed: 'Đăng nhập thất bại',
   upload: 'Gửi tài liệu',
   decrypt: 'Giải mã',
-  delete: 'Xóa tài liệu'
+  delete: 'Xóa tài liệu',
+  account_create: 'Tạo tài khoản',
+  account_update: 'Cập nhật hồ sơ tài khoản',
+  account_status: 'Thay đổi trạng thái tài khoản',
+  account_delete: 'Xóa tài khoản'
 };
 function esc(s = '') {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
